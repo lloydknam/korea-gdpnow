@@ -27,7 +27,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      # 시작 시점의 옛 커밋이 아니라 '지금의 main'을 받음 → 앞선 실행의 결과 위에서 계산
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -41,20 +45,27 @@ jobs:
           ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
         run: python -m nowcast.run
 
-      - name: Commit state & history
-        run: |
-          git config user.name "gdpnow-bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/
-          if ! git diff --cached --quiet; then
-            git commit -m "nowcast $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
-            git pull --rebase
-            git push
-          fi
-
+      # 사이트를 먼저 배포 → 아래 커밋이 실패해도 페이지는 갱신됨
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
       - id: deploy
         uses: actions/deploy-pages@v4
+
+      - name: Commit state & history
+        run: |
+          git config user.name "gdpnow-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "변경 없음"; exit 0
+          fi
+          git commit -m "nowcast $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
+          # 그 사이 main이 바뀌었으면 다시 받아서 얹되, data/ 충돌은 방금 계산한 값으로 해결
+          for i in 1 2 3; do
+            git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          echo "::warning::state 커밋 실패 — 페이지는 배포됨, 다음 실행 때 다시 저장"
