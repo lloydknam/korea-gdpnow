@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>한국 GDP 나우</title>
-<meta name="description" content="한국 실질·경상 GDP 성장률 실시간 추정 — 월간 지표 발표 때마다 갱신">
+<title>Korea GDP Now!</title>
+<meta name="description" content="Korea GDP Now! — 경제성장률 실시간 추정(비공식), 월간 지표 발표 때마다 갱신">
 <meta name="theme-color" content="#f4f1eb" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#16191c" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
@@ -123,7 +123,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 <body>
 <main>
   <div class="badge" id="badge"></div>
-  <h1>한국 GDP 나우</h1>
+  <h1>Korea GDP Now!</h1>
   <p class="lede" id="lede"></p>
 
   <section id="head"></section>
@@ -183,7 +183,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
   </section>
 
   <footer>
-    <div class="inst">Korea GDP <i>now</i></div>
+    <div class="inst">Korea GDP <i>Now!</i></div>
     <div class="credit">데이터: 한국은행 ECOS · 통계청 · 관세청 &nbsp;|&nbsp; 공식 전망 아님</div>
   </footer>
 </main>
@@ -576,7 +576,7 @@ function renderQuarter() { renderQHead(); renderGDP(); renderContrib(); renderCh
 function renderAll() { renderHead(); renderYoY(); renderQuarter(); renderChip(); renderBT(); renderMethod(); }
 if (DATA) {
   $("#badge").textContent = kst(DATA.generated_at, { year: "numeric", month: "long", day: "numeric" }) + " 업데이트";
-  $("#lede").textContent = DATA.annual ? `${DATA.annual.year}년 실질·경상 성장률 실시간 추정` : "분기 GDP 성장률 실시간 추정";
+  $("#lede").textContent = `${DATA.annual ? DATA.annual.year : new Date().getFullYear()}년 경제성장률 실시간 추정(비공식)`;
   renderAll();
   let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderAll);
