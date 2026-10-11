@@ -1,0 +1,8 @@
+# 관세청 수출 속보 — 보도자료 나올 때마다 한 줄 추가 (GitHub 웹/앱에서 이 파일 편집 → 저장하면 자동 재계산)
+# period: d10(1~10일) / d20(1~20일) / m(월 전체, 산업부 수출입동향)
+# exports_yoy_pct: 누적 수출액 전년동기비(%). workdays/workdays_prev: 보도자료의 조업일수(비우면 자동 계산, 토요일 0.5일)
+# chip_yoy_pct, exports_usd_mn: 참고용(현재 계산엔 미사용)
+release_date,ref_month,period,exports_yoy_pct,workdays,workdays_prev,exports_usd_mn,chip_yoy_pct
+2026-09-11,2026-09,d10,82.6,,,,270.0
+2026-09-21,2026-09,d20,78.3,15.5,16.5,71400,259.4
+2026-10-01,2026-09,m,83.5,,,120940,263.0

@@ -1,0 +1,103 @@
+# 한국 GDP 나우 — 시계열 정의
+# 모든 코드는 2026-10-11 ECOS 메타데이터 API로 확인함.
+# items: ECOS StatisticSearch의 ITEM_CODE1/2/3 순서
+
+target:
+  key: gdp
+  label: 실질 GDP (계절조정, 전기비)
+  stat: "200Y102"      # 2.1.1.2. 주요지표(분기지표)
+  cycle: Q
+  items: ["10111"]     # 국내총생산(GDP)(실질, 계절조정, 전기비), %
+  start: 2000Q1
+
+# 브리지 방정식에 들어가는 월간 지표 (계절조정 수준 지수)
+bridge:
+  ip:
+    label: 광공업
+    stat: "901Y033"    # 8.1.4. 전산업생산지수(농림어업제외)
+    items: [AB00, "2"] # 광공업 / 계절조정
+    source: 통계청 산업활동동향
+  sv:
+    label: 서비스업
+    stat: "901Y033"
+    items: [AC00, "2"]
+    source: 통계청 산업활동동향
+  cn:
+    label: 건설업
+    stat: "901Y033"
+    items: [AD00, "2"] # 건설업 생산(건설기성 불변) / 계절조정
+    source: 통계청 산업활동동향
+  pa:
+    label: 공공행정
+    stat: "901Y033"
+    items: [AE00, "2"]
+    source: 통계청 산업활동동향
+  ex:
+    label: 실질수출
+    stat: "403Y002"    # 3.3.1.1.2. 수출물량지수 (원계열 → 자체 계절·영업일 조정)
+    items: ["*AA"]
+    seasonal_adjust: true
+    customs_flash: true   # 관세청 10일·20일·월 속보로 미발표 월 보강
+    source: 한은 수출물량지수 + 관세청 속보
+
+# 보조 지표 (모형 보간·표시용)
+aux:
+  esi:
+    label: 경제심리지수
+    stat: "513Y001"
+    items: [E1000]
+  xp_usd:
+    label: 수출물가(달러기준)
+    stat: "402Y014"
+    items: ["*AA", D]
+  chip_vol:
+    label: 반도체 수출물량
+    stat: "403Y002"
+    items: ["3091AA"]
+  chip_px:
+    label: 반도체 수출물가(달러)
+    stat: "402Y014"
+    items: ["3091AA", D]
+  all_ind:
+    label: 전산업생산
+    stat: "901Y033"
+    items: [A00, "2"]
+
+# 경상성장률용: 명목 GDP(계절조정 전기비) → 디플레이터 = (1+명목)/(1+실질) − 1
+nominal:
+  label: 명목 GDP (계절조정, 전기비)
+  stat: "200Y102"
+  items: ["60111"]     # 국내총생산(GDP)(명목, 계절조정, 전기비), 2010Q2~
+  start: 2010Q2
+
+# GDP 디플레이터 브리지: 국내 물가 + 교역조건(수출·수입물가, 원화)
+deflator:
+  bridge_start: 2010Q3
+  bridge:
+    cpi:
+      label: 소비자물가
+      stat: "901Y009"  # 4.2.1. 소비자물가지수
+      items: ["0"]     # 총지수
+      seasonal_adjust: true
+      source: 통계청
+    px:
+      label: 수출물가(원화)
+      stat: "402Y014"
+      items: ["*AA", W]
+      source: 한국은행
+    pm:
+      label: 수입물가(원화)
+      stat: "401Y015"  # 4.3.2.1. 수입물가지수(기본분류)
+      items: ["*AA", W]
+      source: 한국은행
+
+monthly_start: "200001"
+
+model:
+  bridge_start: 2006Q1
+  exclude_quarters: [2020Q1, 2020Q2, 2020Q3, 2020Q4]   # 코로나 충격 분기
+  exclude_months_from: "2020-02"
+  exclude_months_to: "2020-12"
+  ar_lags: 2
+  ar_start: "2011-01"
+  backtest_start: 2015Q1
