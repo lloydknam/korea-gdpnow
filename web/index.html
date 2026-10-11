@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Korea GDP Now</title>
-<meta name="description" content="Korea GDP Now! — 경제성장률 실시간 추정(비공식), 월간 지표 발표 때마다 갱신">
+<meta name="description" content="Korea GDP Now — 경제성장률 실시간 추정(비공식), 월간 지표 발표 때마다 갱신">
 <meta name="theme-color" content="#f4f1eb" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#16191c" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
@@ -14,7 +14,7 @@
   --bg:#f4f1eb; --rule:#d9d4ca;
   --ink:#14181d; --ink-2:#4a4f55; --ink-3:#7c8086;
   --grid:#e2ddd3; --axis:#b5afa4;
-  --main:#135f8c; --band:#a9d3ea; --band2:#dcd8cf; --badge:#2b8fcc;
+  --main:#135f8c; --band:#a9d3ea; --band2:#dcd8cf; --head:#0f4c75; --badge:#2b8fcc;
   --cmp1:#4a5057; --cmp2:#9b9a95; --neg:#b9533d; --chip:#ece8e0;
 }
 @media (prefers-color-scheme:dark){
@@ -23,7 +23,7 @@
     --bg:#16191c; --rule:#2f3439;
     --ink:#eef0f2; --ink-2:#b8bdc3; --ink-3:#868b91;
     --grid:#262a2f; --axis:#454b52;
-    --main:#5aa9db; --band:#22506d; --band2:#33373c; --badge:#2b8fcc;
+    --main:#5aa9db; --band:#22506d; --band2:#33373c; --head:#8cc4ea; --badge:#2b8fcc;
     --cmp1:#c3c7cc; --cmp2:#7e8389; --neg:#e07a63; --chip:#23272b;
   }
 }
@@ -32,7 +32,7 @@
   --bg:#16191c; --rule:#2f3439;
   --ink:#eef0f2; --ink-2:#b8bdc3; --ink-3:#868b91;
   --grid:#262a2f; --axis:#454b52;
-  --main:#5aa9db; --band:#22506d; --band2:#33373c; --badge:#2b8fcc;
+  --main:#5aa9db; --band:#22506d; --band2:#33373c; --head:#8cc4ea; --badge:#2b8fcc;
   --cmp1:#c3c7cc; --cmp2:#7e8389; --neg:#e07a63; --chip:#23272b;
 }
 *{box-sizing:border-box}
@@ -45,7 +45,7 @@ main{max-width:640px;margin:0 auto}
 h1{font-size:32px;font-weight:800;letter-spacing:-.035em;line-height:1.1;margin:0}
 .lede{font-size:18px;color:var(--ink);margin:4px 0 18px}
 section{border-top:1px solid var(--rule);padding:18px 0 20px}
-h2{font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin:0}
+h2{font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin:0;color:var(--head)}
 .sub{font-size:13px;color:var(--ink-2);margin:2px 0 10px}
 .unitlbl{font-size:13px;color:var(--ink-2);margin:12px 0 0}
 
@@ -130,7 +130,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 <body>
 <main>
   <div class="badge" id="badge"></div>
-  <h1>Korea GDP Now!</h1>
+  <h1>Korea GDP Now</h1>
   <p class="lede" id="lede"></p>
 
   <section id="head"></section>
@@ -190,7 +190,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
   </section>
 
   <footer>
-    <div class="inst">Korea GDP <i>Now!</i></div>
+    <div class="inst">Korea GDP <i>Now</i></div>
     <div class="credit">데이터: 한국은행 ECOS · 통계청 · 관세청 &nbsp;|&nbsp; 공식 전망 아님</div>
     <a class="hits" href="https://hits.sh/lloydknam.github.io/korea-gdpnow/" aria-label="방문자 수">
       <img src="https://hits.sh/lloydknam.github.io/korea-gdpnow.svg?view=today-total&amp;style=flat-square&amp;label=%EC%98%A4%EB%8A%98%20%2F%20%EC%A0%84%EC%B2%B4%20%EB%B0%A9%EB%AC%B8&amp;color=%23135f8c&amp;labelColor=%234a5057" alt="방문자 수" height="20" loading="lazy">
