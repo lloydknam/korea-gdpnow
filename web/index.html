@@ -24,3 +24,609 @@
     --ink:#eef0f2; --ink-2:#b8bdc3; --ink-3:#868b91;
     --grid:#262a2f; --axis:#454b52;
     --main:#5aa9db; --band:#22506d; --band2:#33373c; --badge:#2b8fcc;
+    --cmp1:#c3c7cc; --cmp2:#7e8389; --neg:#e07a63; --chip:#23272b;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#16191c; --rule:#2f3439;
+  --ink:#eef0f2; --ink-2:#b8bdc3; --ink-3:#868b91;
+  --grid:#262a2f; --axis:#454b52;
+  --main:#5aa9db; --band:#22506d; --band2:#33373c; --badge:#2b8fcc;
+  --cmp1:#c3c7cc; --cmp2:#7e8389; --neg:#e07a63; --chip:#23272b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%;
+  padding:max(20px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom))}
+main{max-width:640px;margin:0 auto}
+.badge{display:inline-block;background:var(--badge);color:#fff;font-weight:800;font-size:15px;letter-spacing:.02em;padding:5px 14px;margin:0 0 10px}
+h1{font-size:32px;font-weight:800;letter-spacing:-.035em;line-height:1.1;margin:0}
+.lede{font-size:18px;color:var(--ink);margin:4px 0 18px}
+section{border-top:1px solid var(--rule);padding:18px 0 20px}
+h2{font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin:0}
+.sub{font-size:13px;color:var(--ink-2);margin:2px 0 10px}
+.unitlbl{font-size:13px;color:var(--ink-2);margin:12px 0 0}
+
+/* 헤드라인 */
+.heads{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:2px 0 0}
+.heads>div{min-width:0}
+.heads>div+div{border-left:1px solid var(--rule);padding-left:16px}
+.h-l{font-size:14px;font-weight:700;color:var(--ink-2)}
+.h-v{font-size:46px;font-weight:800;letter-spacing:-.04em;line-height:1.05;margin:2px 0 4px;white-space:nowrap}
+.h-v small{font-size:22px;font-weight:700;margin-left:1px}
+.h-n{font-size:12.5px;color:var(--ink-2);line-height:1.4}
+.h-meta{font-size:13px;color:var(--ink-2);margin-top:12px;line-height:1.55}
+.h-meta b{color:var(--ink)}
+
+/* 차트 */
+.chart{width:100%;position:relative;touch-action:pan-y}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:inherit;fill:var(--ink-3);font-size:11px}
+.chart .lbl{fill:var(--ink);font-weight:700;font-size:12px}
+.chart .ann{fill:var(--ink);font-size:12.5px}
+.vlegend{display:grid;grid-template-columns:auto 1fr auto;gap:5px 10px;align-items:center;font-size:13.5px;margin:14px 4px 0}
+.vlegend .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.key{display:inline-block;width:16px;height:12px}
+.key.sq{background:var(--main)}
+.key.band{background:var(--band)}
+.key.band2{background:var(--band2)}
+.key.dmain{height:0;border-top:2.5px dashed var(--main);margin-top:6px}
+.key.line{height:0;border-top:2.5px solid var(--cmp2);margin-top:6px}
+.key.dash{height:0;border-top:2.5px dashed var(--cmp1);margin-top:6px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--ink-2);margin:2px 0 8px;align-items:center}
+.legend .key{width:11px;height:11px;margin-right:5px;vertical-align:-1px}
+.legend .key.line,.legend .key.dash,.legend .key.dmain{width:15px;height:0;vertical-align:3px}
+.tip{position:absolute;pointer-events:none;background:var(--bg);color:var(--ink);border:1px solid var(--axis);
+  box-shadow:0 4px 14px rgba(0,0,0,.12);padding:6px 9px;font-size:12px;line-height:1.4;
+  opacity:0;transition:opacity .08s;white-space:nowrap;z-index:5}
+.tip b{font-size:13px;font-weight:700}
+.tip .k{color:var(--ink-2)}
+.tip .tk{display:inline-block;width:12px;height:0;border-top:2px solid;margin-right:5px;vertical-align:3px}
+
+/* 분기 */
+.qbar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:10px 0 6px}
+.tabs{display:flex;gap:0;border:1px solid var(--ink)}
+.tab{border:0;background:transparent;color:var(--ink);font:inherit;font-size:13.5px;padding:6px 12px;cursor:pointer}
+.tab+.tab{border-left:1px solid var(--ink)}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);font-weight:700}
+.unit{display:inline-flex;gap:0;border:1px solid var(--axis)}
+.unit button{border:0;background:transparent;color:var(--ink-2);font:inherit;font-size:12.5px;padding:4px 10px;cursor:pointer}
+.unit button[aria-pressed="true"]{background:var(--chip);color:var(--ink);font-weight:700}
+.q-v{font-size:40px;font-weight:800;letter-spacing:-.035em;line-height:1.1;margin:6px 0 2px}
+.q-v small{font-size:19px;font-weight:700}
+.q-n{font-size:13px;color:var(--ink-2)}
+.pill{display:inline-block;font-size:12px;padding:2px 8px;background:var(--chip);color:var(--ink-2);margin:8px 6px 0 0}
+.warn{font-size:12.5px;border-left:3px solid var(--badge);padding:4px 10px;color:var(--ink-2);margin-top:10px}
+h3{font-size:15px;font-weight:800;letter-spacing:-.02em;margin:22px 0 2px}
+.chg-v{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.mini{display:grid;grid-template-columns:1fr;gap:14px}
+.mini h4{font-size:13.5px;margin:0;display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 8px}
+.mini h4 span{font-weight:500;color:var(--ink-2);font-size:12px}
+
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--grid)}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:700;color:var(--ink-2);font-size:12px;border-bottom:1px solid var(--axis)}
+tr:last-child td{border-bottom:0}
+td.est{color:var(--main);font-weight:600}
+details{margin-top:12px}
+summary{cursor:pointer;font-size:13px;color:var(--ink-2);padding:4px 0}
+.note{font-size:12.5px;color:var(--ink-2)}
+.note ul{padding-left:18px;margin:8px 0 0}
+.note li{margin:4px 0}
+.note li b{color:var(--ink);font-weight:700}
+.note ul ul{margin:2px 0 6px;padding-left:16px;list-style:'– '}
+.note ul ul li{margin:1px 0}
+footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
+.inst{font-family:Georgia,"Times New Roman","Nanum Myeongjo",serif;font-size:15px;letter-spacing:.32em;color:var(--ink-2);text-transform:uppercase}
+.inst i{font-style:italic;letter-spacing:.05em;text-transform:none}
+.credit{font-size:11.5px;color:var(--ink-3);margin-top:6px}
+.hits{display:inline-block;margin-top:12px;line-height:0}
+.hits img{height:20px;width:auto}
+</style>
+</head>
+<body>
+<main>
+  <div class="badge" id="badge"></div>
+  <h1>Korea GDP Now!</h1>
+  <p class="lede" id="lede"></p>
+
+  <section id="head"></section>
+
+  <section>
+    <h2>실질·경상 GDP 성장률</h2>
+    <p class="sub">전년동기비, 계절조정 기준 · 음영은 추정 구간의 오차범위(±1 RMSE)</p>
+    <div class="chart" id="c-yoy"></div>
+    <div class="vlegend" id="yoy-legend"></div>
+  </section>
+
+  <section id="qsec">
+    <h2>분기 실시간 추정</h2>
+    <div class="qbar"><div class="tabs" id="tabs" role="tablist"></div><div class="unit" id="unit" role="group" aria-label="단위"></div></div>
+    <div id="qhead"></div>
+
+    <h3>분기 실질 성장률</h3>
+    <p class="sub" id="gdp-sub"></p>
+    <div class="legend"><span><i class="key line" style="border-color:var(--main)"></i>한은 발표</span><span><i class="key dmain"></i>실시간 추정</span><span><i class="key band"></i>오차범위 (±1 RMSE)</span></div>
+    <div class="chart" id="c-gdp"></div>
+
+    <h3>지표별 기여도</h3>
+    <p class="sub" id="contrib-sub"></p>
+    <div class="chart" id="c-contrib"></div>
+
+    <div id="chg"></div>
+
+    <h3>추정치 변화</h3>
+    <p class="sub" id="hist-sub"></p>
+    <div class="chart" id="c-hist"></div>
+  </section>
+
+  <section>
+    <h2>월별 지표</h2>
+    <p class="sub">전월비(%, 계절조정) · 지표마다 세로 눈금이 다름</p>
+    <div class="legend"><span><i class="key sq"></i>실적</span><span><i class="key" style="background:var(--cmp1)"></i>관세청 속보 반영</span><span><i class="key band"></i>미발표 — 모형 추정</span></div>
+    <div class="mini" id="mini"></div>
+  </section>
+
+  <section>
+    <h2>반도체 수출: 물량 vs 단가</h2>
+    <p class="sub">전년동월비(%) · 단가 상승분은 실질성장률엔 빠지고 경상성장률(디플레이터)로 들어감</p>
+    <div class="legend"><span><i class="key line" style="border-color:var(--main)"></i>물량 (수출물량지수)</span><span><i class="key dash"></i>단가 (수출물가·달러)</span></div>
+    <div class="chart" id="c-chip"></div>
+  </section>
+
+  <section>
+    <h2>정확도</h2>
+    <p class="sub" id="bt-sub"></p>
+    <table id="bt"></table>
+    <div id="act"></div>
+  </section>
+
+  <section class="note">
+    <h2>방법</h2>
+    <ul id="method"></ul>
+  </section>
+
+  <footer>
+    <div class="inst">Korea GDP <i>Now!</i></div>
+    <div class="credit">데이터: 한국은행 ECOS · 통계청 · 관세청 &nbsp;|&nbsp; 공식 전망 아님</div>
+    <a class="hits" href="https://hits.sh/lloydknam.github.io/korea-gdpnow/" aria-label="방문자 수">
+      <img src="https://hits.sh/lloydknam.github.io/korea-gdpnow.svg?view=today-total&amp;style=flat-square&amp;label=%EC%98%A4%EB%8A%98%20%2F%20%EC%A0%84%EC%B2%B4%20%EB%B0%A9%EB%AC%B8&amp;color=%23135f8c&amp;labelColor=%234a5057" alt="방문자 수" height="20" loading="lazy">
+    </a>
+  </footer>
+</main>
+
+<script>
+const DATA = /*__DATA__*/null;
+const $ = (s) => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (v, d = 2, sign = true) => v == null || isNaN(v) ? "–" : (sign && v > 0 ? "+" : "") + v.toFixed(d);
+const kst = (iso, o) => new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", ...o });
+let cur = 0;
+let UNIT = "ann";
+try { const u = localStorage.getItem("gdpnow-unit"); if (u === "ann" || u === "qoq") UNIT = u; } catch (e) {}
+const annz = (q) => q == null ? null : (Math.pow(1 + q / 100, 4) - 1) * 100;
+const U = (q) => UNIT === "ann" ? annz(q) : q;
+const UNAME = () => UNIT === "ann" ? "연율" : "전기비";
+const UD = () => UNIT === "ann" ? 1 : 2;
+const scaleFor = (q) => UNIT === "ann" ? (Math.abs(q) > 1e-6 ? annz(q) / q : 4) : 1;
+
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function txt(parent, x, y, s, attrs = {}) { const t = el("text", { x, y, ...attrs }, parent); t.textContent = s; return t; }
+function h(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function niceTicks(lo, hi, n = 4) {
+  const span = hi - lo || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
+  const out = [], top = Math.ceil(hi / step - 1e-9) * step;
+  for (let v = Math.floor(lo / step + 1e-9) * step; v <= top + 1e-9; v += step) out.push(+v.toFixed(6));
+  return out;
+}
+function tipFor(box) {
+  let t = box.querySelector(".tip"); if (!t) { t = h("div", "tip"); box.appendChild(t); }
+  return {
+    show(lines, x, y) {
+      t.replaceChildren();
+      lines.forEach((ln, i) => {
+        const row = h("div");
+        if (ln.key) { const k = h("span", "tk"); k.style.borderColor = ln.key; if (ln.dash) k.style.borderTopStyle = "dashed"; row.appendChild(k); }
+        row.appendChild(h(i === 0 || ln.strong ? "b" : "span", ln.cls || "", ln.v));
+        if (ln.k) { row.appendChild(document.createTextNode(" ")); row.appendChild(h("span", "k", ln.k)); }
+        t.appendChild(row);
+      });
+      const W = box.clientWidth, tw = t.offsetWidth;
+      t.style.left = Math.max(0, Math.min(W - tw, x - tw / 2)) + "px";
+      t.style.top = Math.max(0, y - t.offsetHeight - 10) + "px";
+      t.style.opacity = 1;
+    },
+    hide() { t.style.opacity = 0; }
+  };
+}
+function barPath(x, w, y0, y1, r = 3) {
+  const up = y1 < y0, top = Math.min(y0, y1), bot = Math.max(y0, y1), hgt = bot - top;
+  r = Math.min(r, w / 2, hgt);
+  if (hgt < 0.5) return `M${x},${y0}h${w}`;
+  return up
+    ? `M${x},${bot}V${top + r}Q${x},${top} ${x + r},${top}H${x + w - r}Q${x + w},${top} ${x + w},${top + r}V${bot}Z`
+    : `M${x},${top}H${x + w}V${bot - r}Q${x + w},${bot} ${x + w - r},${bot}H${x + r}Q${x},${bot} ${x},${bot - r}Z`;
+}
+function grid(svg, ticks, Y, x0, x1, dg = 0) {
+  ticks.forEach(tk => {
+    el("line", { x1: x0, x2: x1, y1: Y(tk), y2: Y(tk), stroke: tk === 0 ? css("--axis") : css("--grid"), "stroke-width": 1 }, svg);
+    txt(svg, x0 - 6, Y(tk) + 3.5, tk.toFixed(dg), { "text-anchor": "end" });
+  });
+}
+const svgPt = (svg, W, e) => { const r = svg.getBoundingClientRect(); return { sx: (e.clientX - r.left) * W / r.width, k: r.width / W }; };
+
+// ================================================================ 헤드라인 (연간 실질·경상)
+function renderHead() {
+  const A = DATA.annual, box = $("#head"); box.replaceChildren();
+  if (!A) { box.appendChild(h("p", "sub", "연간 성장률 계산에 필요한 데이터가 아직 없습니다.")); return; }
+  const est = A.path.filter(p => p.real_est).map(p => +p.q.slice(5));
+  const heads = h("div", "heads");
+  [["실질성장률", A.real, A.real_sd, A.prev?.real, A.change?.real_from],
+   ["경상성장률", A.nominal, A.nom_sd, A.prev?.nominal, A.change?.nominal_from]].forEach(([lab, v, sd, prev, from]) => {
+    const c = h("div");
+    c.appendChild(h("div", "h-l", `${A.year}년 ${lab}`));
+    const vv = h("div", "h-v", fmt(v, 1, false)); vv.appendChild(h("small", "", "%")); c.appendChild(vv);
+    c.appendChild(h("div", "h-n", `범위 ${(v - sd).toFixed(1)} ~ ${(v + sd).toFixed(1)}%`));
+    if (prev != null) c.appendChild(h("div", "h-n", `${A.year - 1}년 ${prev.toFixed(1)}%`));
+    if (from != null) c.appendChild(h("div", "h-n", `직전 갱신 ${from.toFixed(1)}% → ${fmt(v - from, 1)}%p`));
+    heads.appendChild(c);
+  });
+  box.appendChild(heads);
+  const m = h("div", "h-meta");
+  m.appendChild(h("b", "", `GDP 디플레이터 ${fmt(A.deflator, 1)}%`));
+  m.appendChild(document.createTextNode(
+    ` · 연간(전년비) 기준. 실질은 ${est.length ? (4 - est.length) + "개 분기 발표 + " + est.map(q => q + "분기").join("·") + " 실시간 추정" : "4개 분기 모두 발표"}, ` +
+    `명목은 ${A.nominal_last.replace("Q", "년 ")}분기까지 발표.`));
+  box.appendChild(m);
+  const d = h("details"); d.appendChild(h("summary", "", `${A.year}년 분기 경로 (전기비, %)`));
+  const t = h("table"), r0 = h("tr"); ["분기", "실질", "디플레이터", "명목"].forEach(s => r0.appendChild(h("th", "", s))); t.appendChild(r0);
+  A.path.forEach(p => {
+    const tr = h("tr"); tr.appendChild(h("td", "", p.q.replace("Q", "년 ") + "분기"));
+    [[p.real, p.real_est], [p.defl, p.defl_est], [p.nom, p.real_est || p.defl_est]].forEach(([v, e]) => tr.appendChild(h("td", e ? "est" : "", fmt(v, 1) + (e ? "*" : ""))));
+    t.appendChild(tr);
+  });
+  d.appendChild(t); d.appendChild(h("p", "note", "* 실시간 추정치(파란 글씨). 나머지는 한은 발표치."));
+  box.appendChild(d);
+}
+
+// ================================================================ MCT 스타일 장기 차트
+function renderYoY() {
+  const A = DATA.annual, box = $("#c-yoy"); box.replaceChildren(); $("#yoy-legend").replaceChildren();
+  if (!A || !A.yoy.length) return;
+  const rows = A.yoy, n = rows.length;
+  const W = box.clientWidth || 360, H = Math.round(Math.min(400, Math.max(320, W * 0.9)));
+  const m = { t: 66, r: 16, b: 26, l: 30 };   // 위쪽 66px = 주석 자리
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "실질·경상 GDP 성장률 추이" }, box);
+  const vals = rows.flatMap(r => [r.real, r.nom, r.defl, ...(r.real_band || [])]).concat([0]);
+  const ticks = niceTicks(Math.min(...vals), Math.max(...vals), 5);
+  const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const X = i => m.l + (W - m.l - m.r) * i / (n - 1);
+  const Y = v => m.t + (H - m.t - m.b) * (1 - (v - y0) / (y1 - y0));
+  grid(svg, ticks, Y, m.l, W - m.r);
+  txt(svg, 0, m.t - 14, "%", { fill: css("--ink-2"), "font-size": 13 });
+  rows.forEach((r, i) => { if (r.q.endsWith("Q1")) { el("line", { x1: X(i), x2: X(i), y1: H - m.b, y2: H - m.b + 4, stroke: css("--axis") }, svg); txt(svg, X(i), H - 6, r.q.slice(0, 4), { "text-anchor": "middle" }); } });
+  // 오차범위 음영: 마지막 발표 분기에서 폭 0으로 시작해 추정 분기로 갈수록 넓어짐
+  const shade = (bk, vk, color, op) => {
+    const bi = rows.map((r, i) => r[bk] ? i : -1).filter(i => i >= 0);
+    if (!bi.length) return null;
+    const s0 = Math.max(0, bi[0] - 1), up = [], dn = [];
+    for (let i = s0; i <= bi[bi.length - 1]; i++) { const b = rows[i][bk] || [rows[i][vk], rows[i][vk]]; up.push(`${X(i)},${Y(b[1])}`); dn.unshift(`${X(i)},${Y(b[0])}`); }
+    el("path", { d: `M${up.join("L")}L${dn.join("L")}Z`, fill: color, opacity: op }, svg);
+    return s0;
+  };
+  shade("nom_band", "nom", css("--band2"), .95);
+  const s0 = shade("real_band", "real", css("--band"), .85);
+  if (s0 != null) {
+    el("line", { x1: X(s0), x2: X(s0), y1: m.t, y2: H - m.b, stroke: css("--axis"), "stroke-dasharray": "2 3" }, svg);
+    txt(svg, X(s0) + 4, m.t + 12, "추정", { fill: css("--ink-3"), "font-size": 10.5 });
+  }
+  const line = (k, color, w, dash) => el("path", { d: rows.map((r, i) => `${i ? "L" : "M"}${X(i)},${Y(r[k])}`).join(""), fill: "none", stroke: color, "stroke-width": w, "stroke-linejoin": "round", "stroke-linecap": "round", ...(dash ? { "stroke-dasharray": dash } : {}) }, svg);
+  line("defl", css("--cmp2"), 2);
+  line("nom", css("--cmp1"), 2, "6 4");
+  line("real", css("--main"), 3);
+  const L = rows[n - 1], lx = X(n - 1), ly = Y(L.real);
+  el("circle", { cx: lx, cy: ly, r: 4.5, fill: css("--main"), stroke: css("--bg"), "stroke-width": 2 }, svg);
+  // 주석 + 점선 화살표 (빈 공간 쪽에 배치)
+  const ch = A.change;
+  const ann = ch ? [`${A.year}년 실질성장률 추정치가`, `${ch.real_from.toFixed(1)}%에서 ${A.real.toFixed(1)}%로`, ch.real_from <= A.real ? "높아졌습니다" : "낮아졌습니다"]
+                 : [`${A.year}년 실질성장률`, `${A.real.toFixed(1)}%, 경상 ${A.nominal.toFixed(1)}%로`, "추정됩니다"];
+  // MCT처럼 플롯 위 오른쪽에 문장 → 점선이 오른쪽 가장자리를 타고 내려와 마지막 점을 가리킴
+  const tx = W - 30, ty = 14;
+  ann.forEach((s, i) => txt(svg, tx, ty + i * 17, s, { "text-anchor": "end", class: "ann" }));
+  const ay = ty + 13, ex = W - 2;
+  el("path", { d: `M${tx + 6},${ay}H${ex}V${ly}H${lx + 10}`, fill: "none", stroke: css("--ink-2"), "stroke-width": 1.2, "stroke-dasharray": "2 3" }, svg);
+  el("path", { d: `M${lx + 16},${ly - 5}L${lx + 9},${ly}L${lx + 16},${ly + 5}`, fill: "none", stroke: css("--ink-2"), "stroke-width": 1.4 }, svg);
+  // 크로스헤어
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), opacity: 0 }, svg), tip = tipFor(box);
+  const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", e => {
+    const { sx, k } = svgPt(svg, W, e);
+    const i = Math.max(0, Math.min(n - 1, Math.round((sx - m.l) / (W - m.l - m.r) * (n - 1)))), r = rows[i];
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", 1);
+    const ls = [{ v: `${r.q.replace("Q", "년 ")}분기${r.est ? " (추정)" : ""}`, cls: "k" },
+      { v: fmt(r.real) + "%", k: "실질", key: css("--main"), strong: true },
+      { v: fmt(r.nom) + "%", k: "경상", key: css("--cmp1"), dash: true, strong: true },
+      { v: fmt(r.defl) + "%", k: "디플레이터", key: css("--cmp2") }];
+    if (r.real_band) ls.push({ v: `실질 범위 ${r.real_band[0].toFixed(1)} ~ ${r.real_band[1].toFixed(1)}%`, cls: "k" });
+    if (r.nom_band) ls.push({ v: `경상 범위 ${r.nom_band[0].toFixed(1)} ~ ${r.nom_band[1].toFixed(1)}%`, cls: "k" });
+    tip.show(ls, X(i) * k, (m.t + 80) * k);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
+  const lg = $("#yoy-legend"), lq = `${L.q.slice(0, 4)}년 ${L.q.slice(5)}분기`;
+  [["sq", `실질 GDP (${lq})`, fmt(L.real) + "%"],
+   ["band", "실질 오차범위", L.real_band ? `${L.real_band[0].toFixed(2)}%, ${L.real_band[1].toFixed(2)}%` : "–"],
+   ["dash", "경상 GDP", fmt(L.nom) + "%"],
+   ["band2", "경상 오차범위", L.nom_band ? `${L.nom_band[0].toFixed(2)}%, ${L.nom_band[1].toFixed(2)}%` : "–"],
+   ["line", "GDP 디플레이터", fmt(L.defl) + "%"]].forEach(([k, lab, v]) => {
+    lg.appendChild(h("i", "key " + k)); lg.appendChild(h("span", "", lab)); lg.appendChild(h("span", "v", v));
+  });
+}
+
+// ================================================================ 분기 실시간 추정
+function renderQHead() {
+  const t = DATA.targets[cur], box = $("#qhead"); box.replaceChildren();
+  const tabs = $("#tabs"); tabs.replaceChildren();
+  DATA.targets.forEach((tt, i) => {
+    const b = h("button", "tab", `${tt.quarter.slice(0, 4)}년 ${tt.quarter.slice(5)}분기`);
+    b.setAttribute("role", "tab"); b.setAttribute("aria-selected", i === cur);
+    b.onclick = () => { cur = i; renderQuarter(); };
+    tabs.appendChild(b);
+  });
+  const un = $("#unit"); un.replaceChildren();
+  [["ann", "연율"], ["qoq", "전기비"]].forEach(([k, n]) => {
+    const b = h("button", "", n); b.setAttribute("aria-pressed", UNIT === k);
+    b.onclick = () => { UNIT = k; try { localStorage.setItem("gdpnow-unit", k); } catch (e) {} renderQuarter(); };
+    un.appendChild(b);
+  });
+  box.appendChild(h("div", "q-n", `${t.label} 실질 GDP 성장률 · ${UNIT === "ann" ? "연율(SAAR)" : "전기비, 계절조정"}`));
+  const v = h("div", "q-v", fmt(U(t.nowcast), UD())); v.appendChild(h("small", "", "%")); box.appendChild(v);
+  box.appendChild(h("div", "q-n", `오차범위 ${fmt(U(t.band[0]), UD())} ~ ${fmt(U(t.band[1]), UD())}% · ${UNIT === "ann" ? "전기비 " + fmt(t.nowcast) : "연율 " + fmt(annz(t.nowcast), 1)}%`));
+  box.appendChild(h("span", "pill", ["분기 내 실적 없음 — 전망 성격", "1개월 실적 반영", "2개월 실적 반영", "3개월 실적 모두 반영"][t.months_known]));
+  box.appendChild(h("span", "pill", `직전 발표 ${DATA.gdp.last_quarter.replace("Q", "년 ")}분기 ${fmt(U(DATA.gdp.last_value), UD())}%`));
+  if (t.months_known === 0) box.appendChild(h("div", "warn", "이 분기는 아직 월간 실적이 없어 AR 외삽과 심리지수에 기댄 값입니다. 첫 달 산업활동동향이 나오면 크게 움직일 수 있습니다."));
+}
+
+function renderGDP() {
+  const box = $("#c-gdp"); box.replaceChildren();
+  $("#gdp-sub").textContent = `실질 GDP ${UNAME()}(%)`;
+  const W = box.clientWidth || 340, H = 210, m = { t: 22, r: 34, b: 22, l: 30 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "분기별 실질 GDP 성장률" }, box);
+  const act = DATA.gdp.series.slice(-8).map(d => ({ q: d.q, v: U(d.v), est: false }));
+  const est = DATA.targets.map(t => ({ q: t.quarter, v: U(t.nowcast), est: true, lo: U(t.band[0]), hi: U(t.band[1]) }));
+  const rows = act.concat(est), n = rows.length, la = act.length - 1;
+  const vals = rows.flatMap(r => r.est ? [r.lo, r.hi, r.v] : [r.v]).concat([0]);
+  const ticks = niceTicks(Math.min(...vals), Math.max(...vals));
+  const X = i => m.l + 10 + (W - m.l - m.r - 10) * i / (n - 1);
+  const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks[ticks.length - 1] - ticks[0]));
+  grid(svg, ticks, Y, m.l, W - m.r, 1);
+  // 오차범위 음영 (마지막 발표 분기에서 폭 0으로 시작)
+  const up = [`${X(la)},${Y(act[la].v)}`], dn = [`${X(la)},${Y(act[la].v)}`];
+  est.forEach((r, j) => { up.push(`${X(la + 1 + j)},${Y(r.hi)}`); dn.unshift(`${X(la + 1 + j)},${Y(r.lo)}`); });
+  el("path", { d: `M${up.join("L")}L${dn.join("L")}Z`, fill: css("--band"), opacity: .85 }, svg);
+  el("line", { x1: X(la), x2: X(la), y1: m.t, y2: H - m.b, stroke: css("--axis"), "stroke-dasharray": "2 3" }, svg);
+  txt(svg, X(la) + 4, H - m.b - 6, "추정", { fill: css("--ink-3"), "font-size": 10.5 });
+  // 선: 발표치는 실선, 실시간 추정은 점선
+  const path = (from, to, dash) => el("path", { d: rows.slice(from, to + 1).map((r, k) => `${k ? "L" : "M"}${X(from + k)},${Y(r.v)}`).join(""), fill: "none", stroke: css("--main"), "stroke-width": 2.5, "stroke-linejoin": "round", "stroke-linecap": "round", ...(dash ? { "stroke-dasharray": "5 4" } : {}) }, svg);
+  path(0, la, false); path(la, n - 1, true);
+  const tip = tipFor(box), colW = (W - m.l - m.r) / (n - 1);
+  rows.forEach((r, i) => {
+    const cx = X(i), g = el("g", { tabindex: 0 }, svg);
+    el("circle", { cx, cy: Y(r.v), r: r.est ? 4.5 : 3.5, fill: r.est ? css("--bg") : css("--main"), stroke: css("--main"), "stroke-width": r.est ? 2 : 0 }, g);
+    if (r.est) txt(svg, cx, Y(r.v) - 10, fmt(r.v, 1, false), { "text-anchor": "middle", class: "lbl" });
+    else if (i === la) txt(svg, cx - 8, Y(r.v) + 16, fmt(r.v, 1, false), { "text-anchor": "end", class: "lbl" });
+    const [yy, qq] = r.q.split("Q");
+    txt(svg, cx, H - 6, (qq === "1" || i === 0 ? `'${yy.slice(2)}.` : "") + qq + "Q", { "text-anchor": "middle" });
+    el("rect", { x: cx - colW / 2, y: m.t, width: colW, height: H - m.t - m.b, fill: "transparent" }, g);
+    const show = () => { const k = box.clientWidth / W; tip.show([{ v: fmt(r.v) + "%" }, { v: r.est ? `${r.q} 실시간 추정 (범위 ${fmt(r.lo, 1)} ~ ${fmt(r.hi, 1)})` : `${r.q} 한은 발표`, cls: "k" }], cx * k, Y(r.est ? r.hi : r.v) * k); };
+    g.addEventListener("pointerenter", show); g.addEventListener("focus", show);
+    g.addEventListener("pointerleave", tip.hide); g.addEventListener("blur", tip.hide);
+  });
+}
+
+function divBars(box, items, opts = {}) {
+  box.replaceChildren();
+  const W = box.clientWidth || 340, rowH = 30, lw = 78, rw = 54, H = items.length * rowH + 6;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": opts.aria || "" }, box);
+  const ext = Math.max(0.05, ...items.map(d => Math.abs(d.v)));
+  const x0 = lw + (W - lw - rw) / 2, half = (W - lw - rw) / 2 - 2, X = v => x0 + (v / ext) * half;
+  el("line", { x1: x0, x2: x0, y1: 0, y2: H, stroke: css("--axis") }, svg);
+  const tip = tipFor(box);
+  items.forEach((d, i) => {
+    const cy = i * rowH + rowH / 2 + 2, bh = 14, g = el("g", { tabindex: 0 }, svg);
+    txt(g, 0, cy + 4, d.label, { fill: css("--ink"), "font-size": 12.5 });
+    const color = d.neutral ? css("--cmp2") : (d.v >= 0 ? css("--main") : css("--neg"));
+    const a = X(0), b = X(d.v), x = Math.min(a, b), w = Math.abs(b - a), r = Math.min(3, w / 2, bh / 2);
+    if (w >= .5) el("path", { d: d.v >= 0
+      ? `M${x},${cy - bh / 2}H${x + w - r}Q${x + w},${cy - bh / 2} ${x + w},${cy - bh / 2 + r}V${cy + bh / 2 - r}Q${x + w},${cy + bh / 2} ${x + w - r},${cy + bh / 2}H${x}Z`
+      : `M${x + w},${cy - bh / 2}H${x + r}Q${x},${cy - bh / 2} ${x},${cy - bh / 2 + r}V${cy + bh / 2 - r}Q${x},${cy + bh / 2} ${x + r},${cy + bh / 2}H${x + w}Z`, fill: color }, g);
+    txt(g, d.v >= 0 ? b + 5 : b - 5, cy + 4, fmt(d.v, opts.digits ?? 2), { "text-anchor": d.v >= 0 ? "start" : "end", class: "lbl" });
+    el("rect", { x: 0, y: cy - rowH / 2, width: W, height: rowH, fill: "transparent" }, g);
+    const show = () => { const k = box.clientWidth / W; tip.show([{ v: fmt(d.v, 3) + "%p" }, { v: d.label, k: d.note || "", cls: "k" }], X(d.v) * k, (cy - 6) * k); };
+    g.addEventListener("pointerenter", show); g.addEventListener("focus", show);
+    g.addEventListener("pointerleave", tip.hide); g.addEventListener("blur", tip.hide);
+  });
+}
+function renderContrib() {
+  const t = DATA.targets[cur], f = scaleFor(t.nowcast);
+  const items = t.indicators.map(d => ({ label: d.label, v: d.contrib * f, note: `분기 증가율 ${fmt(d.x)}% × 계수 ${d.coef.toFixed(2)}` }));
+  items.push({ label: "상수항", v: t.const * f, neutral: true, note: "지표로 설명 안 되는 평균 성장" });
+  $("#contrib-sub").textContent = `${t.label} ${fmt(U(t.nowcast), UD())}%(${UNAME()}) = 각 지표 기여 + 상수 (%p${UNIT === "ann" ? ", 연율로 비례 환산" : ""})`;
+  divBars($("#c-contrib"), items, { aria: "지표별 기여도" });
+}
+function renderChange() {
+  const t = DATA.targets[cur], box = $("#chg"); box.replaceChildren();
+  box.appendChild(h("h3", "", "최근 갱신의 변동 요인"));
+  const c = t.last_change;
+  if (!c || c.from == null) { box.appendChild(h("p", "sub", "첫 추정입니다. 다음 지표 발표부터 변동 요인이 표시됩니다.")); return; }
+  const nNew = U(t.nowcast), nOld = U(c.from), d = nNew - nOld;
+  const fx = Math.abs(t.nowcast - c.from) > 1e-6 ? d / (t.nowcast - c.from) : scaleFor(t.nowcast);
+  box.appendChild(h("p", "sub", `${kst(c.at, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 갱신 · ${c.new_data.length ? "새로 반영: " + c.new_data.join(", ") : "지표 수정·보간 변화"}`));
+  const head = h("div"); head.appendChild(h("span", "chg-v", `${fmt(nOld, UD())} → ${fmt(nNew, UD())}%`));
+  head.appendChild(h("span", "sub", `  (${fmt(d, UD())}%p)`)); box.appendChild(head);
+  const cb = h("div", "chart"); box.appendChild(cb);
+  divBars(cb, c.items.filter(x => Math.abs(x.delta) >= 0.0005).map(x => ({ label: x.label, v: x.delta * fx, neutral: x.key === "_model" })), { aria: "변동 요인" });
+}
+function renderHist() {
+  const box = $("#c-hist"); box.replaceChildren();
+  const t = DATA.targets[cur];
+  $("#hist-sub").textContent = `${t.label} 실질 ${UNAME()}(%) · 갱신 시점별, 파란 띠 = 현재 정보량의 오차범위`;
+  const pts = t.history.map(p => ({ t: new Date(p.at), v: U(p.v) }));
+  if (pts.length < 2) { box.appendChild(h("p", "sub", "갱신이 두 번 이상 쌓이면 추이가 그려집니다.")); return; }
+  const sd = Math.abs(U(t.band[1]) - U(t.band[0])) / 2;
+  const W = box.clientWidth || 340, H = 170, m = { t: 12, r: 48, b: 22, l: 30 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "추정치 추이" }, box);
+  const ticks = niceTicks(Math.min(0, ...pts.map(p => p.v - sd)), Math.max(...pts.map(p => p.v + sd)));
+  const t0 = +pts[0].t, t1 = +pts[pts.length - 1].t;
+  const X = tt => m.l + (W - m.l - m.r) * ((+tt - t0) / ((t1 - t0) || 1));
+  const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks[ticks.length - 1] - ticks[0]));
+  grid(svg, ticks, Y, m.l, W - m.r, 1);
+  const sp = []; pts.forEach((p, i) => { if (i) sp.push([X(p.t), pts[i - 1].v]); sp.push([X(p.t), p.v]); });
+  el("path", { d: "M" + sp.map(([x, v]) => `${x},${Y(v + sd)}`).join("L") + "L" + sp.slice().reverse().map(([x, v]) => `${x},${Y(v - sd)}`).join("L") + "Z", fill: css("--band"), opacity: .85 }, svg);
+  el("path", { d: "M" + sp.map(([x, v]) => `${x},${Y(v)}`).join("L"), fill: "none", stroke: css("--main"), "stroke-width": 2.5, "stroke-linejoin": "round" }, svg);
+  const last = pts[pts.length - 1];
+  el("circle", { cx: X(last.t), cy: Y(last.v), r: 4.5, fill: css("--main"), stroke: css("--bg"), "stroke-width": 2 }, svg);
+  txt(svg, X(last.t) + 8, Y(last.v) + 4, fmt(last.v, UD()), { class: "lbl" });
+  const fd = d => `${d.getMonth() + 1}/${d.getDate()}`;
+  txt(svg, m.l, H - 6, fd(pts[0].t)); txt(svg, W - m.r, H - 6, fd(last.t), { "text-anchor": "end" });
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), opacity: 0 }, svg), tip = tipFor(box);
+  const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", e => {
+    const { sx, k } = svgPt(svg, W, e);
+    let best = pts[0]; for (const p of pts) if (Math.abs(X(p.t) - sx) < Math.abs(X(best.t) - sx)) best = p;
+    cross.setAttribute("x1", X(best.t)); cross.setAttribute("x2", X(best.t)); cross.setAttribute("opacity", 1);
+    tip.show([{ v: fmt(best.v, UD()) + "%" }, { v: best.t.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }), cls: "k" }], X(best.t) * k, Y(best.v) * k);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
+}
+
+// ================================================================ 월별 지표
+function renderMini() {
+  const box = $("#mini"); box.replaceChildren();
+  DATA.targets[cur].indicators.forEach(d => {
+    const ext = Math.max(0.5, ...d.months.map(x => Math.abs(x.mom)));
+    const wrap = h("div"), head = h("h4", "", d.label);
+    head.appendChild(h("span", "", `분기 ${fmt(d.x, 1)}% · 실적 ${d.actual_last.replace("-", ".")}까지 · 눈금 ±${ext < 10 ? ext.toFixed(1) : Math.round(ext)}%`));
+    wrap.appendChild(head); const cb = h("div", "chart"); wrap.appendChild(cb); box.appendChild(wrap);
+    const W = cb.clientWidth || 340, H = 80, m = { t: 6, b: 16 };
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": d.label + " 전월비" }, cb);
+    const Y = v => m.t + (H - m.t - m.b) * (1 - (v + ext) / (2 * ext));
+    const n = d.months.length, band = W / n, bw = Math.min(14, band - 3), tip = tipFor(cb);
+    d.months.forEach((p, i) => { if (+p.m.slice(5) % 3 === 1 && i) el("line", { x1: band * i, x2: band * i, y1: m.t, y2: H - m.b, stroke: css("--grid") }, svg); });
+    el("line", { x1: 0, x2: W, y1: Y(0), y2: Y(0), stroke: css("--axis") }, svg);
+    d.months.forEach((p, i) => {
+      const x = band * i + (band - bw) / 2, g = el("g", { tabindex: 0 }, svg);
+      el("path", { d: barPath(x, bw, Y(0), Y(p.mom), 2), fill: p.filled ? css("--band") : (p.flash ? css("--cmp1") : css("--main")) }, g);
+      const mm = +p.m.slice(5);
+      if (mm % 3 === 1) txt(svg, x + bw / 2, H - 3, mm === 1 ? `'${p.m.slice(2, 4)}.1` : mm + "월", { "text-anchor": "middle" });
+      el("rect", { x: band * i, y: 0, width: band, height: H, fill: "transparent" }, g);
+      const show = () => { const k = cb.clientWidth / W; tip.show([{ v: fmt(p.mom) + "%" }, { v: `${p.m} ${p.filled ? "모형 추정" : p.flash ? "관세청 속보 반영" : "실적"}`, cls: "k" }], (x + bw / 2) * k, Y(Math.max(p.mom, 0)) * k); };
+      g.addEventListener("pointerenter", show); g.addEventListener("focus", show);
+      g.addEventListener("pointerleave", tip.hide); g.addEventListener("blur", tip.hide);
+    });
+  });
+}
+
+// ================================================================ 반도체
+function renderChip() {
+  const box = $("#c-chip"); box.replaceChildren();
+  const rows = DATA.chips; if (rows.length < 2) return;
+  const W = box.clientWidth || 340, H = 190, m = { t: 12, r: 44, b: 22, l: 34 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "반도체 수출 물량과 단가" }, box);
+  const ticks = niceTicks(Math.min(0, ...rows.flatMap(r => [r.vol, r.px])), Math.max(...rows.flatMap(r => [r.vol, r.px])));
+  const X = i => m.l + (W - m.l - m.r) * i / (rows.length - 1);
+  const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks[ticks.length - 1] - ticks[0]));
+  grid(svg, ticks, Y, m.l, W - m.r);
+  const S = [["px", css("--cmp1"), 2, "6 4"], ["vol", css("--main"), 2.5, null]];
+  S.forEach(([k, c, w, dash]) => el("path", { d: rows.map((r, i) => `${i ? "L" : "M"}${X(i)},${Y(r[k])}`).join(""), fill: "none", stroke: c, "stroke-width": w, "stroke-linejoin": "round", "stroke-linecap": "round", ...(dash ? { "stroke-dasharray": dash } : {}) }, svg));
+  const L = rows[rows.length - 1], ys = S.map(([k]) => Y(L[k]));
+  S.forEach(([k, c], j) => el("circle", { cx: X(rows.length - 1), cy: ys[j], r: 4, fill: c, stroke: css("--bg"), "stroke-width": 2 }, svg));
+  if (Math.abs(ys[0] - ys[1]) > 14) S.forEach(([k], j) => txt(svg, X(rows.length - 1) + 8, ys[j] + 4, fmt(L[k], 0), { class: "lbl" }));
+  rows.forEach((r, i) => { const mm = +r.m.slice(5); if (mm === 1 || i === 0) txt(svg, X(i), H - 6, `'${r.m.slice(2, 4)}.${mm}`, { "text-anchor": i === 0 ? "start" : "middle" }); });
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), opacity: 0 }, svg), tip = tipFor(box);
+  const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", e => {
+    const { sx, k } = svgPt(svg, W, e);
+    const i = Math.max(0, Math.min(rows.length - 1, Math.round((sx - m.l) / (W - m.l - m.r) * (rows.length - 1)))), r = rows[i];
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", 1);
+    tip.show([{ v: r.m, cls: "k" }, { v: fmt(r.vol, 1) + "%", k: "물량", key: css("--main"), strong: true }, { v: fmt(r.px, 1) + "%", k: "단가", key: css("--cmp1"), dash: true, strong: true }, { v: fmt(r.val, 1) + "%", k: "금액(≈물량×단가)" }], X(i) * k, (m.t + 40) * k);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
+}
+
+// ================================================================ 정확도·방법
+function renderBT() {
+  const b = DATA.backtest, D = DATA.deflator, tbl = $("#bt"); tbl.replaceChildren();
+  $("#bt-sub").textContent = `${b.period} 의사 실시간 백테스트(${b.n}개 분기). 분기 내 실적 개월 수별 평균제곱근오차, 전기비 %p`;
+  const hd = h("tr"); ["정보량", "실질 GDP", "디플레이터"].forEach(s => hd.appendChild(h("th", "", s))); tbl.appendChild(hd);
+  ["실적 0개월", "1개월", "2개월", "3개월"].forEach((nm, k) => { const tr = h("tr"); [nm, b.rmse[k]?.toFixed(2), D?.rmse[k]?.toFixed(2)].forEach(s => tr.appendChild(h("td", "", s ?? "–"))); tbl.appendChild(tr); });
+  const tr = h("tr"); ["참고: GDP AR(1)", b.ar_rmse?.toFixed(2), ""].forEach(s => tr.appendChild(h("td", "", s))); tbl.appendChild(tr);
+  const act = $("#act"); act.replaceChildren();
+  if (DATA.actuals.length) {
+    const d = h("details"); d.open = true; d.appendChild(h("summary", "", "실제 속보치와 비교 (실질, 전기비)"));
+    const t2 = h("table"), r0 = h("tr"); ["분기", "마지막 추정치", "한은 속보치", "오차"].forEach(s => r0.appendChild(h("th", "", s))); t2.appendChild(r0);
+    DATA.actuals.slice().reverse().forEach(a => { const r = h("tr"); [a.q, fmt(a.final_nowcast), fmt(a.advance), fmt(a.advance - a.final_nowcast)].forEach(s => r.appendChild(h("td", "", s))); t2.appendChild(r); });
+    d.appendChild(t2); act.appendChild(d);
+  }
+  act.appendChild(h("p", "note", "백테스트는 개정된 최종 통계로 계산해 실제 실시간 오차보다 작게 나옵니다. 실전 오차는 '속보치와 비교'가 쌓이면서 드러납니다."));
+}
+function renderMethod() {
+  const B = DATA.bridge, D = DATA.deflator, ul = $("#method"); ul.replaceChildren();
+  const co = (o) => Object.entries(o.coef).map(([k, v]) => `${o.labels[k]} ${v.toFixed(2)}`).join(" · ");
+  const items = [
+    ["실질 성장률: 브리지 방정식", [
+      `GDP 전기비 = ${B.const.toFixed(2)} + Σ 계수 × 월간 지표의 분기 증가율`,
+      `계수: ${co(B)}`,
+      `표본 ${B.sample}, R² ${B.r2.toFixed(2)}, 코로나 분기 제외`]],
+    ["경상 성장률: 실질 × GDP 디플레이터", [
+      "디플레이터 실적 = (1+명목 전기비) / (1+실질 전기비) − 1",
+      D && `디플레이터 브리지: ${D.const.toFixed(2)} + ${co(D)} (표본 ${D.sample}, R² ${D.r2.toFixed(2)})`,
+      "수출물가 상승 > 수입물가 상승(교역조건 개선) → 경상 > 실질"]],
+    ["연간 성장률", [
+      "분기 전기비 연쇄 → 연평균 수준 비교",
+      "계절조정 기준 → 한은 원계열 연간치와 ±0.1%p 안팎 차이 가능"]],
+    ["오차범위", [
+      "과거 분기를 같은 정보량으로 재추정한 오차(백테스트 RMSE)",
+      "연간: 추정 분기별 RMSE를 연평균 기여 가중치로 합산"]],
+    ["미발표 월 보간", [
+      "지표별 AR(2) 외삽",
+      "실물 지표는 경제심리지수 변화 추가"]],
+    ["실질수출", [
+      "한은 수출물량지수(STL 계절조정 + 영업일 보정) → 반도체 단가 효과 제거",
+      "물량지수 미발표 월: 관세청 10일·20일·월 속보 금액 증가율 ÷ 수출물가(달러) 증가율",
+      ...DATA.customs.map(c => `반영: ${c.month}(${({ d10: "10일", d20: "20일", m: "월" })[c.period] || c.period}) 금액 ${fmt(c.value_yoy, 1)}% − 단가 ${fmt(c.price_yoy, 1)}% → 물량 ${fmt(c.volume_yoy, 1)}%`)]],
+    ["계수 재추정", [
+      "GDP 신규 발표·개정 시에만",
+      "분기 중 추정치 변동 → 전부 지표 기여로 분해"]],
+    ["분기 연율(SAAR)", [
+      "(1 + 전기비)⁴ − 1",
+      "한은 공식 발표는 전기비"]],
+  ];
+  items.forEach(([t, subs]) => {
+    const li = h("li"); li.appendChild(h("b", "", t));
+    const sub = h("ul"); subs.filter(Boolean).forEach(x => sub.appendChild(h("li", "", x)));
+    li.appendChild(sub); ul.appendChild(li);
+  });
+}
+
+function renderQuarter() { renderQHead(); renderGDP(); renderContrib(); renderChange(); renderHist(); renderMini(); }
+function renderAll() { renderHead(); renderYoY(); renderQuarter(); renderChip(); renderBT(); renderMethod(); }
+if (DATA) {
+  $("#badge").textContent = kst(DATA.generated_at, { year: "numeric", month: "long", day: "numeric" }) + " 업데이트";
+  $("#lede").textContent = `${DATA.annual ? DATA.annual.year : new Date().getFullYear()}년 경제성장률 실시간 추정(비공식)`;
+  renderAll();
+  let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderAll);
+}
+</script>
+</body>
+</html>
