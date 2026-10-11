@@ -1,0 +1,60 @@
+name: nowcast
+
+on:
+  schedule:
+    # 평일 KST 09:15 / 12:40 / 17:30 (산업활동동향·GDP 08:00, 수출입물가 06:00 발표 이후)
+    - cron: "15 0 * * 1-5"
+    - cron: "40 3 * * 1-5"
+    - cron: "30 8 * * 1-5"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["data/customs_flash.csv", "config/**", "nowcast/**", "web/**"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: nowcast
+  cancel-in-progress: false
+
+jobs:
+  nowcast:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run nowcast
+        env:
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+        run: python -m nowcast.run
+
+      - name: Commit state & history
+        run: |
+          git config user.name "gdpnow-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if ! git diff --cached --quiet; then
+            git commit -m "nowcast $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
+            git pull --rebase
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
