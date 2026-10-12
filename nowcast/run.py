@@ -224,11 +224,13 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         rmse = bt["rmse"].get(str(k_known)) or bridge["sd"]
         real_nc[q] = (nc["value"], rmse, k_known)
         qs = str(q)
-        through = {k: str(meta[k]["last"]) for k in keys}
+        through = {k: f"{meta[k]['actual_last']}|{meta[k]['last']}" for k in keys}
         prev = state["runs"].get(qs)
         changes = decompose(prev, nc, prev and prev.get("bridge"), bridge)
+        # 예전 state(마지막 월만 저장)와도 비교되도록: '|'가 없으면 보강 후 월만 비교
+        _same = lambda old, new: old == new if (old is None or "|" in old) else old == new.split("|")[1]
         new_data = [labels[k] for k in keys
-                    if prev and prev.get("through", {}).get(k) != through[k]]
+                    if prev and not _same(prev.get("through", {}).get(k), through[k])]
         changed = (prev is None or abs(prev["value"] - nc["value"]) >= 0.005 or new_data
                    or (prev.get("bridge", {}).get("id") != bridge["id"]))
         if changed:
@@ -320,6 +322,20 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
             "nominal_last": str(raw["nominal"].dropna().index.max()),
             "yoy": yoy_path(real_map, defl_map, sd_r, sd_d, "2019Q1", pd.Period(f"{year}Q4", "Q")),
         }
+        # 이번 실행에서 새로 반영된 지표 (변화 원인 주석용)
+        run_new = []
+        for row in new_hist:
+            for x in str(row.get("new_data") or "").split("|"):
+                if x and x not in run_new:
+                    run_new.append(x)
+        dthrough = {k: str(meta[k]["last"]) for k in dkeys}
+        dprev = state.get("defl_through") or {}
+        if dprev:
+            run_new += [dlabels[k] for k in dkeys if dprev.get(k) != dthrough[k] and dlabels[k] not in run_new]
+        state["defl_through"] = dthrough
+        if bridge_prev and bridge_prev.get("id") != bridge.get("id"):
+            run_new.append("GDP 발표·개정")
+
         # 연간 추정치 이력 (값이 바뀔 때만 한 줄)
         ah_path = data_dir / "annual_history.csv"
         ah = pd.read_csv(ah_path) if ah_path.exists() else pd.DataFrame(columns=["run_at", "year", "real", "nominal"])
@@ -331,15 +347,20 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
                                     "real_from": r(float(last["real"].iloc[0])),
                                     "nominal_from": r(float(last["nominal"].iloc[0]))}
             ah = pd.concat([ah, pd.DataFrame([{"run_at": now.isoformat(timespec="minutes"), "year": year,
-                                               "real": r(ann["real"], 3), "nominal": r(ann["nominal"], 3)}])],
+                                               "real": r(ann["real"], 3), "nominal": r(ann["nominal"], 3),
+                                               "real_sd": r(rs, 3), "nom_sd": r(float(np.hypot(rs, ds)), 3),
+                                               "new_data": "|".join(run_new)}])],
                            ignore_index=True)
             ah.to_csv(ah_path, index=False)
         else:
             annual["change"] = state.get("annual_change")
         state["annual_change"] = annual.get("change")
         ay = ah[ah["year"] == year]
-        annual["history"] = [{"at": a, "real": r(x), "nominal": r(y)}
-                             for a, x, y in zip(ay["run_at"], ay["real"], ay["nominal"])]
+        num = lambda v: None if pd.isna(v) else r(float(v), 3)
+        annual["history"] = [{"at": row["run_at"], "real": num(row["real"]), "nominal": num(row["nominal"]),
+                              "real_sd": num(row.get("real_sd")), "nom_sd": num(row.get("nom_sd")),
+                              "new": [x for x in str(row.get("new_data") if pd.notna(row.get("new_data")) else "").split("|") if x]}
+                             for _, row in ay.iterrows()]
 
     if new_hist:
         hist = pd.concat([hist, pd.DataFrame(new_hist)], ignore_index=True)
