@@ -165,7 +165,9 @@ def exp_section(cfg: dict, raw: dict, levels: dict, esi: pd.Series, targets: lis
         lv[k] = adjust.seasonal_adjust(raw[k]) if s.get("seasonal_adjust") else raw[k]
     bridges, stats, trend = {}, {}, {}
     excl = {pd.Period(q, "Q") for q in mcfg["exclude_quarters"]}
-    for comp, ind in ecfg["exp_bridge"].items():
+    eb = dict(ecfg["exp_bridge"])
+    ix, im = eb.pop("x"), eb.pop("m")
+    for comp, ind in eb.items():
         y = 100 * np.log(L[comp] / L[comp].shift(1))
         X = pd.DataFrame({ind: model.q_growth(lv[ind])})
         br = model.fit_bridge(y, X, mcfg["bridge_start"], mcfg["exclude_quarters"])
@@ -176,6 +178,18 @@ def exp_section(cfg: dict, raw: dict, levels: dict, esi: pd.Series, targets: lis
             continue
         bridges[comp] = br
         stats[comp] = {"ind": ind, "coef": _r(br["coef"][ind], 3), "const": _r(br["const"], 3), "r2": _r(br["r2"], 2)}
+    # 순수출은 한 식으로: 기여도 = a + b·(수출 비중×수출물량 증가율 − 수입 비중×수입물량 증가율)
+    # (수출·수입을 따로 브리지하면 각각 평균 쪽으로 깎이는 정도가 달라 순수출이 한쪽으로 치우침)
+    gx, gm = model.q_growth(lv[ix]), model.q_growth(lv[im])
+    sx, sm = L["x"] / L["gdp"], L["m"] / L["gdp"]
+    z = (sx.shift(1) * gx - sm.shift(1) * gm).dropna()
+    nx_y = pd.Series({q: hist[q]["nx"] for q in hist})
+    zz = pd.concat([z.rename("z"), nx_y.rename("y")], axis=1).dropna()
+    zz = zz[(zz.index >= pd.Period(mcfg["bridge_start"], "Q")) & ~zz.index.isin(excl)]
+    nxfit = _ols(zz["y"].values, zz["z"].values)
+    stats["nx"] = {"ind": "nx", "coef": _r(nxfit["b"], 3), "const": _r(nxfit["a"], 3), "r2": _r(nxfit["r2"], 2)}
+    unit = lambda ind: {"const": 0.0, "coef": {ind: 1.0}}
+
     recent = [q for q in sorted(hist)[-12:] if q not in excl][-8:]
     other_mean = float(np.mean([hist[q]["other"] for q in recent]))
 
@@ -184,9 +198,12 @@ def exp_section(cfg: dict, raw: dict, levels: dict, esi: pd.Series, targets: lis
         prev = cur
         g = {comp: model.nowcast(lv, esi, q, br, mcfg)["value"] for comp, br in bridges.items()}
         g.update(trend)
+        g["x"] = model.nowcast(lv, esi, q, unit(ix), mcfg)["x"][ix]
+        g["m"] = model.nowcast(lv, esi, q, unit(im), mcfg)["x"][im]
         nxt = {k: prev[k] * np.exp(g[k] / 100) if k in g else prev[k] for k in prev}
         c = {k: (nxt[k] - prev[k]) / prev["gdp"] * 100 for k in ("pc", "gc", "ci", "ei")}
-        c["nx"] = ((nxt["x"] - prev["x"]) - (nxt["m"] - prev["m"])) / prev["gdp"] * 100
+        zq = prev["x"] / prev["gdp"] * g["x"] - prev["m"] / prev["gdp"] * g["m"]
+        c["nx"] = nxfit["a"] + nxfit["b"] * zq
         c["other"] = other_mean
         tot = sum(c.values())
         nxt["gdp"] = prev["gdp"] * (1 + tot / 100)
@@ -204,5 +221,7 @@ def exp_section(cfg: dict, raw: dict, levels: dict, esi: pd.Series, targets: lis
     return {"rows": rows, "labels": EXP_LABEL, "order": EXP_SHOW, "last": str(last),
             "bridge": stats, "other_mean": _r(other_mean, 3),
             "ind_labels": {"sv": "서비스업생산", "pa": "공공행정", "cn": "건설업생산", "eq": "설비투자지수",
-                           "ex": "실질수출", "mv": "수입물량", "trend": "최근 8분기 평균"},
-            "comp_labels": {"pc": "민간소비", "gc": "정부소비", "ci": "건설투자", "ei": "설비투자", "x": "수출", "m": "수입"}}
+                           "ex": "실질수출", "mv": "수입물량", "trend": "최근 8분기 평균",
+                           "nx": "수출−수입 물량"},
+            "comp_labels": {"pc": "민간소비", "gc": "정부소비", "ci": "건설투자", "ei": "설비투자", "nx": "순수출"},
+            "trade": {"x": "수출물량", "m": "수입물량"}}
