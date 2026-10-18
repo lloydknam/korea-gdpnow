@@ -1,0 +1,68 @@
+# 발표 일정 — 사이트 '다음 발표 일정'용
+# rule로 날짜를 추정(사이트에 '예상' 표시). 공식 일정이 확인되면 fixed에 날짜를 적으면 '확정'으로 바뀜.
+# rule 종류
+#   day: N            매월 N일 (주말·공휴일이면 다음 영업일, no_shift: true면 그대로)
+#   last_bday         매월 마지막 영업일
+#   nth_weekday: [n, w, months]  지정 월의 n번째 요일(w: 0=월 … 6=일), months 비우면 매월
+#   last_weekday: [w, months]    지정 월의 마지막 요일
+# affects: 모형에 들어가는 지표 키 (ip·sv·cn·pa = 산업활동동향, ex = 실질수출, px·pm = 수출입물가, cpi, esi, gdp)
+releases:
+  - key: customs_m
+    name: 수출입 현황(월, 잠정)
+    org: 관세청·산업부
+    time: "09:00"
+    rule: {day: 1, no_shift: true}   # 산업부는 휴일에도 1일 발표
+    ref: prev            # 전월 자료
+    affects: [ex]
+  - key: cpi
+    name: 소비자물가
+    org: 통계청
+    time: "08:00"
+    rule: {day: 2}
+    ref: prev
+    affects: [cpi]
+  - key: customs_d10
+    name: 수출입 현황(1~10일)
+    org: 관세청
+    time: "09:00"
+    rule: {day: 11}
+    ref: cur
+    affects: [ex]
+  - key: prices
+    name: 수출입물가·무역지수
+    org: 한국은행
+    time: "06:00"
+    rule: {day: 15}
+    ref: prev
+    affects: [px, pm, ex]
+  - key: customs_d20
+    name: 수출입 현황(1~20일)
+    org: 관세청
+    time: "09:00"
+    rule: {day: 21}
+    ref: cur
+    affects: [ex]
+  - key: esi
+    name: 경제심리지수
+    org: 한국은행
+    time: "06:00"
+    rule: {day: 25}
+    ref: cur
+    affects: [esi]
+  - key: activity
+    name: 산업활동동향
+    org: 통계청
+    time: "08:00"
+    rule: {last_bday: true}
+    ref: prev
+    affects: [ip, sv, cn, pa]
+  - key: gdp_adv
+    name: GDP 속보
+    org: 한국은행
+    time: "08:00"
+    rule: {nth_weekday: [4, 3, [1, 4, 7, 10]]}
+    ref: prevq
+    affects: [gdp]
+
+# 확정 일정 (공식 공지 확인 후 추가): key: [YYYY-MM-DD, ...]
+fixed: {}
