@@ -58,6 +58,24 @@ class FakeSession:
         raise AssertionError(url)
 
 
+class RelaySession(FakeSession):
+    """korea.kr 직접 접속은 시간 초과, r.jina.ai 경유는 성공하는 GitHub 서버 상황."""
+    def get(self, url, params=None, headers=None, **kw):
+        from urllib.parse import parse_qsl, urlsplit
+        import requests
+        if url.startswith(cs.BASE):
+            raise requests.ConnectTimeout("timed out")
+        assert url.startswith("https://r.jina.ai/https://www.korea.kr/"), url
+        u = urlsplit(url[len("https://r.jina.ai/"):])
+        q = dict(parse_qsl(u.query))
+        if "pageIndex" in q:
+            q["pageIndex"] = int(q["pageIndex"])
+        r = super().get(f"{u.scheme}://{u.netloc}{u.path}", params=q)
+        if u.path.endswith("download.do") and r.content.startswith(b"%PDF"):
+            return Resp(text=PDF_TEXT[q["fileId"]], content=PDF_TEXT[q["fileId"]].encode())  # 리더가 PDF를 텍스트로
+        return Resp(text=r.text + " " * 300, content=r.content)
+
+
 def test():
     cs.pdf_text = lambda data, max_pages=3: PDF_TEXT.get(data.split(b":")[1].decode(), "")
 
@@ -82,6 +100,7 @@ def test():
     tmp = Path(tempfile.mkdtemp()) / "customs_flash.csv"
     shutil.copy(cs.CSV, tmp)
     before = tmp.read_text(encoding="utf-8")
+    cs._route["mode"] = "direct"
     new = cs.scrape(path=tmp, sess=FakeSession())
     # 9월 d20·m은 이미 있음 → 10월 d10만 추가, 반도체는 PDF에서
     assert [(r["ref_month"], r["period"]) for r in new] == [("2026-10", "d10")], new
@@ -100,6 +119,13 @@ def test():
     from nowcast.adjust import load_customs
     df = load_customs(tmp)
     assert len(df) == 2 and set(df["period"]) == {"d10", "m"}, df  # d20은 VIEW 없음 → 건너뜀
+
+    # GitHub 서버 상황: 직접 접속 실패 → 웹 리더 경유
+    cs._route["mode"] = "direct"
+    tmp.write_text("release_date,ref_month,period,exports_yoy_pct,workdays,workdays_prev,exports_usd_mn,chip_yoy_pct\n")
+    new = cs.scrape(path=tmp, sess=RelaySession())
+    got = {(r["ref_month"], r["period"]): (r["exports_yoy_pct"], r.get("chip_yoy_pct")) for r in new}
+    assert got == {("2026-10", "d10"): (102.0, 170.9), ("2026-09", "m"): (83.5, 263.0)}, got
     print("customs_scrape OK")
 
 
