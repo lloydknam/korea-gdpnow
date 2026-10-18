@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from . import adjust, ecos, model
+from . import adjust, ecos, extras, model
 
 ROOT = Path(__file__).resolve().parent.parent
 KST = timezone(timedelta(hours=9))
@@ -383,6 +383,22 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
             chips.append({"m": str(p), "vol": r(vy * 100, 1), "px": r(py * 100, 1),
                           "val": r(((1 + vy) * (1 + py) - 1) * 100, 1)})
 
+    # 6) 부가 분석 ❹ 실질 GNI ❺ 분배 ❻ 지출 측 — 실패해도 본 추정은 그대로
+    ext = {"gni": None, "dist": None, "exp": None, "errors": []}
+    if "extras" in cfg:
+        xr = extras.collect(cfg, fetcher, f"{now.year}Q4", f"{now.year}{now.month:02d}")
+        ext["errors"] = xr.pop("_errors", [])
+        prod = {q: v for q, (v, _, _) in real_nc.items()}
+        for name, fn in [("gni", lambda: extras.gni_section(xr, raw["px"], raw["pm"], annual)),
+                         ("dist", lambda: extras.dist_section(xr)),
+                         ("exp", lambda: extras.exp_section(cfg, xr, levels, esi, list(real_nc), prod))]:
+            try:
+                ext[name] = fn()
+            except Exception as e:  # noqa: BLE001
+                ext["errors"].append(f"{name}: {type(e).__name__} {e}")
+        for e in ext["errors"]:
+            print(f"::warning::부가 분석 일부 생략 — {e}")
+
     g = gdp.dropna()
     payload = {
         "generated_at": now.isoformat(timespec="minutes"),
@@ -402,6 +418,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         "customs": customs_used,
         "chips": chips,
         "esi": {"last": str(esi.index.max()), "value": r(esi.iloc[-1], 1)},
+        "gni": ext["gni"], "dist": ext["dist"], "expenditure": ext["exp"],
     }
     (site_dir / "nowcast.json").write_text(json.dumps(payload, ensure_ascii=False))
     tpl = (ROOT / "web" / "index.html").read_text()
@@ -414,6 +431,13 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
               f"경상 {annual['nominal']:+.2f}% (±{annual['nom_sd']:.2f}) · 디플레이터 {annual['deflator']:+.2f}%")
     for t in targets_out:
         print(f"{t['label']}: {t['nowcast']:+.2f}% (±{t['rmse']:.2f}, 정보 {t['months_known']}/3개월)")
+    if ext["gni"] and ext["gni"].get("annual"):
+        a = ext["gni"]["annual"]
+        print(f"{a['year']}년 실질 GNI ≈ {a['gni']:+.1f}% (실질 GDP {a['gdp']:+.1f}%, 차이 {a['gap']:+.1f}%p)")
+    if ext["exp"]:
+        for row in ext["exp"]["rows"]:
+            if row["est"]:
+                print(f"{row['q']} 지출 측 합산 {row['gdp']:+.2f}% (생산 측 {row['prod']:+.2f}%)")
     return payload
 
 
