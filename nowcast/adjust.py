@@ -86,8 +86,24 @@ def customs_full_month_yoy(row) -> float:
     return daily * full_ratio - 1
 
 
+# 속보 반영 비중: 기간이 짧을수록 잡음 큼 → 나머지는 직전 달 물량 증가율(추세)로 채움
+FLASH_WEIGHT = {"d10": 0.5, "d20": 0.8, "m": 1.0}
+WORKDAY_GAP_PENALTY = 0.5   # 누적 기간 조업일수가 작년과 2일 이상 차이(명절 이동) → 비중 절반
+
+
+def flash_weight(row) -> float:
+    w = FLASH_WEIGHT.get(row["period"], 1.0)
+    day = PERIOD_DAY.get(row["period"])
+    if day is not None:
+        p = row["ref"]
+        if abs(workdays(p.year, p.month, day) - workdays(p.year - 1, p.month, day)) >= 2:
+            w *= WORKDAY_GAP_PENALTY
+    return w
+
+
 def extend_with_customs(vol_nsa: pd.Series, px_usd: pd.Series, flash: pd.DataFrame):
-    """수출물량지수(원계열)가 없는 월을 관세청 속보 금액 증가율 ÷ 수출물가(달러) 증가율로 보강."""
+    """수출물량지수(원계열)가 없는 월을 관세청 속보 금액 증가율 ÷ 수출물가(달러) 증가율로 보강.
+    물량 증가율 = w × 속보 환산치 + (1−w) × 직전 달 물량 증가율 (w: 10일 0.5 / 20일 0.8 / 월 1.0, 명절 이동 시 절반)."""
     used = []
     if flash.empty or vol_nsa.empty:
         return vol_nsa, used
@@ -101,17 +117,23 @@ def extend_with_customs(vol_nsa: pd.Series, px_usd: pd.Series, flash: pd.DataFra
         row = cand.iloc[-1]
         val_yoy = customs_full_month_yoy(row)
         px_yoy = px_yoy_all.get(ref, px_yoy_all.iloc[-1] if len(px_yoy_all) else 0.0)
-        base = out.get(ref - 12)
+        base, prev, prev12 = out.get(ref - 12), out.get(ref - 1), out.get(ref - 13)
         if base is None or np.isnan(base):
             break
-        vol = base * (1 + val_yoy) / (1 + px_yoy)
-        out.loc[ref] = vol
+        flash_vol = (1 + val_yoy) / (1 + px_yoy) - 1
+        prior = prev / prev12 - 1 if prev is not None and prev12 is not None and prev12 > 0 else flash_vol
+        w = flash_weight(row)
+        vol_yoy = w * flash_vol + (1 - w) * prior
+        out.loc[ref] = base * (1 + vol_yoy)
         out = out.sort_index()
         used.append({
             "month": str(ref), "period": row["period"],
             "value_yoy": round(val_yoy * 100, 1),
             "price_yoy": round(float(px_yoy) * 100, 1),
-            "volume_yoy": round(((1 + val_yoy) / (1 + px_yoy) - 1) * 100, 1),
+            "flash_volume_yoy": round(float(flash_vol) * 100, 1),
+            "prior_yoy": round(float(prior) * 100, 1),
+            "weight": round(w, 2),
+            "volume_yoy": round(float(vol_yoy) * 100, 1),
             "price_assumed": ref not in px_yoy_all.index,
         })
     return out, used
