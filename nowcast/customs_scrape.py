@@ -2,6 +2,7 @@
 
 출처 (1순위 → 2순위)
   ❶ 정책브리핑(korea.kr) 보도자료 검색 '수출입 현황' → 관세청 잠정치 보도자료 찾기
+     (GitHub 서버에서 직접 접속이 막히면 r.jina.ai → allorigins 공개 웹 리더 경유)
   ❷ 보도자료 페이지 meta description: "수출은 261억 달러로 전년동기대비 102.0% 증가"
   ❸ 첨부 PDF 본문(pypdf): 월간 잠정치(meta가 잘림)와 반도체 증감률 보강
 
@@ -50,10 +51,48 @@ RE_EXP = [
 RE_CHIP = re.compile(r"반도체\(([+\-△▲▼]?)([\d.]+)%\)")
 
 
-def _get(sess, url, **kw):
-    r = sess.get(url, headers=UA, timeout=TIMEOUT, **kw)
-    r.raise_for_status()
-    return r
+# GitHub 서버(미국 Azure)에서 korea.kr 직접 접속이 막힘(연결 시간 초과) → 공개 웹 리더 경유로 재시도
+RELAYS = [
+    ("jina", "https://r.jina.ai/{url}", {"X-Return-Format": "html"}),
+    ("allorigins", "https://api.allorigins.win/raw?url={qurl}", {}),
+]
+_route = {"mode": "direct"}   # 한 번 직접 접속 실패하면 이번 실행 내내 경유
+
+
+class _Resp:
+    def __init__(self, text: str, content: bytes):
+        self.text, self.content = text, content
+
+
+def _full_url(url, params):
+    return requests.Request("GET", url, params=params).prepare().url
+
+
+def _get(sess, url, params=None, binary=False):
+    if _route["mode"] == "direct":
+        try:
+            r = sess.get(url, params=params, headers=UA, timeout=(8, TIMEOUT))
+            r.raise_for_status()
+            return r
+        except (requests.ConnectionError, requests.Timeout) as e:
+            print(f"  · korea.kr 직접 접속 실패({type(e).__name__}) → 웹 리더 경유")
+            _route["mode"] = 0
+    full = _full_url(url, params)
+    errs = []
+    for i in range(_route["mode"], len(RELAYS)):
+        name, tpl, hdr = RELAYS[i]
+        relay = tpl.format(url=full, qurl=requests.utils.quote(full, safe=""))
+        h = {**UA, **({} if binary else hdr)}
+        try:
+            r = sess.get(relay, headers=h, timeout=(10, 60))
+            r.raise_for_status()
+            if not binary and len(r.text) < 200:
+                raise requests.HTTPError(f"응답이 너무 짧음({len(r.text)}자)")
+            _route["mode"] = i
+            return r
+        except requests.RequestException as e:
+            errs.append(f"{name}: {type(e).__name__}")
+    raise requests.ConnectionError("모든 경로 실패 — " + ", ".join(errs))
 
 
 def _text(s: str) -> str:
@@ -168,12 +207,16 @@ def fetch_release(sess, item) -> dict | None:
     if "exports_yoy_pct" not in nums or "chip_yoy_pct" not in nums:
         for fid, key in files[:3]:
             try:
-                r = _get(sess, DOWN_URL, params={"fileId": fid, "tblKey": key})
+                r = _get(sess, DOWN_URL, params={"fileId": fid, "tblKey": key}, binary=True)
             except requests.RequestException:
                 continue
-            if not r.content.startswith(b"%PDF"):
+            if r.content.startswith(b"%PDF"):
+                body = pdf_text(r.content)
+            elif _route["mode"] != "direct" and "수출" in (r.text or ""):
+                body = r.text          # 웹 리더가 PDF를 텍스트로 풀어 준 경우
+            else:
                 continue
-            extra = parse_numbers(pdf_text(r.content))
+            extra = parse_numbers(body)
             if extra:
                 src = "pdf" if "exports_yoy_pct" not in nums else "meta+pdf"
             for k, v in extra.items():
