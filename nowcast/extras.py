@@ -132,6 +132,7 @@ def dist_section(raw: dict) -> dict | None:
 
 
 # ------------------------------------------------------------------ ❻ 지출 측
+MIN_R2 = 0.1   # 이보다 낮은 지출 항목 브리지는 쓰지 않음
 EXP_SHOW = ["pc", "gc", "ci", "ei", "nx", "other"]
 EXP_LABEL = {"pc": "민간소비", "gc": "정부소비", "ci": "건설투자", "ei": "설비투자", "nx": "순수출", "other": "기타"}
 
@@ -162,14 +163,19 @@ def exp_section(cfg: dict, raw: dict, levels: dict, esi: pd.Series, targets: lis
         if raw.get(k) is None or raw[k].empty:
             return None
         lv[k] = adjust.seasonal_adjust(raw[k]) if s.get("seasonal_adjust") else raw[k]
-    bridges, stats = {}, {}
+    bridges, stats, trend = {}, {}, {}
+    excl = {pd.Period(q, "Q") for q in mcfg["exclude_quarters"]}
     for comp, ind in ecfg["exp_bridge"].items():
         y = 100 * np.log(L[comp] / L[comp].shift(1))
         X = pd.DataFrame({ind: model.q_growth(lv[ind])})
         br = model.fit_bridge(y, X, mcfg["bridge_start"], mcfg["exclude_quarters"])
+        if br["r2"] < MIN_R2:  # 지표 설명력 없음 → 최근 8개 분기 평균 증가율
+            yy = y.dropna()
+            trend[comp] = float(yy[~yy.index.isin(excl)].tail(8).mean())
+            stats[comp] = {"ind": "trend", "coef": None, "const": _r(trend[comp], 3), "r2": _r(br["r2"], 2)}
+            continue
         bridges[comp] = br
         stats[comp] = {"ind": ind, "coef": _r(br["coef"][ind], 3), "const": _r(br["const"], 3), "r2": _r(br["r2"], 2)}
-    excl = {pd.Period(q, "Q") for q in mcfg["exclude_quarters"]}
     recent = [q for q in sorted(hist)[-12:] if q not in excl][-8:]
     other_mean = float(np.mean([hist[q]["other"] for q in recent]))
 
@@ -177,6 +183,7 @@ def exp_section(cfg: dict, raw: dict, levels: dict, esi: pd.Series, targets: lis
     for q in [t for t in targets if t > last]:
         prev = cur
         g = {comp: model.nowcast(lv, esi, q, br, mcfg)["value"] for comp, br in bridges.items()}
+        g.update(trend)
         nxt = {k: prev[k] * np.exp(g[k] / 100) if k in g else prev[k] for k in prev}
         c = {k: (nxt[k] - prev[k]) / prev["gdp"] * 100 for k in ("pc", "gc", "ci", "ei")}
         c["nx"] = ((nxt["x"] - prev["x"]) - (nxt["m"] - prev["m"])) / prev["gdp"] * 100
@@ -197,5 +204,5 @@ def exp_section(cfg: dict, raw: dict, levels: dict, esi: pd.Series, targets: lis
     return {"rows": rows, "labels": EXP_LABEL, "order": EXP_SHOW, "last": str(last),
             "bridge": stats, "other_mean": _r(other_mean, 3),
             "ind_labels": {"sv": "서비스업생산", "pa": "공공행정", "cn": "건설업생산", "eq": "설비투자지수",
-                           "ex": "실질수출", "mv": "수입물량"},
+                           "ex": "실질수출", "mv": "수입물량", "trend": "최근 8분기 평균"},
             "comp_labels": {"pc": "민간소비", "gc": "정부소비", "ci": "건설투자", "ei": "설비투자", "x": "수출", "m": "수입"}}
