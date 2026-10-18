@@ -16,6 +16,7 @@
   --grid:#e2ddd3; --axis:#b5afa4;
   --main:#135f8c; --band:#a9d3ea; --band2:#dcd8cf; --head:#0f4c75; --badge:#2b8fcc;
   --cmp1:#4a5057; --cmp2:#9b9a95; --neg:#b9533d; --chip:#ece8e0;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
 }
 @media (prefers-color-scheme:dark){
   :root:where(:not([data-theme="light"])){
@@ -25,6 +26,7 @@
     --grid:#262a2f; --axis:#454b52;
     --main:#5aa9db; --band:#22506d; --band2:#33373c; --head:#8cc4ea; --badge:#2b8fcc;
     --cmp1:#c3c7cc; --cmp2:#7e8389; --neg:#e07a63; --chip:#23272b;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
   }
 }
 :root[data-theme="dark"]{
@@ -34,6 +36,7 @@
   --grid:#262a2f; --axis:#454b52;
   --main:#5aa9db; --band:#22506d; --band2:#33373c; --head:#8cc4ea; --badge:#2b8fcc;
   --cmp1:#c3c7cc; --cmp2:#7e8389; --neg:#e07a63; --chip:#23272b;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink)}
@@ -134,6 +137,19 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 .credit{font-size:11.5px;color:var(--ink-3);margin-top:6px}
 .hits{display:inline-block;margin-top:12px;line-height:0}
 .hits img{height:20px;width:auto}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:8px 0 12px}
+.tiles>div{min-width:0}
+.tiles>div+div{border-left:1px solid var(--rule);padding-left:12px}
+.tiles .t-l{font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.tiles .t-v{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1.15;white-space:nowrap}
+.tiles .t-v small{font-size:14px;font-weight:700}
+.tiles .t-n{font-size:11.5px;color:var(--ink-3)}
+.key.s1{background:var(--s1)} .key.s2{background:var(--s2)} .key.s3{background:var(--s3)}
+.key.s4{background:var(--s4)} .key.s5{background:var(--s5)} .key.s0{background:var(--cmp2)}
+.key.dot{width:9px;height:9px;border-radius:50%;background:var(--ink);border:2px solid var(--bg);box-sizing:content-box}
+.key.gni{height:0;border-top:2.5px solid var(--cmp1);margin-top:6px}
+.lead{font-size:13.5px;margin:4px 0 10px}
+.lead b{font-weight:800}
 </style>
 </head>
 <body>
@@ -190,6 +206,33 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
     <p class="sub">전년동월비(%) · 단가 상승분은 실질성장률엔 빠지고 경상성장률(디플레이터)로 들어감</p>
     <div class="legend"><span><i class="key line" style="border-color:var(--main)"></i>물량 (수출물량지수)</span><span><i class="key dash"></i>단가 (수출물가·달러)</span></div>
     <div class="chart" id="c-chip"></div>
+  </section>
+
+  <section id="gni-sec" hidden>
+    <h2>실질 GDP vs 실질 GNI</h2>
+    <p class="sub">전년동기비(%) · 차이 = 교역조건 효과(실질무역손익) + 국외순수취요소소득</p>
+    <div id="gni-tiles"></div>
+    <div class="legend"><span><i class="key line" style="border-color:var(--main)"></i>실질 GDP</span><span><i class="key gni"></i>실질 GNI</span><span><i class="key band2"></i>차이</span><span>점선 = 실시간 추정</span></div>
+    <div class="chart" id="c-gni"></div>
+    <div id="gni-more"></div>
+  </section>
+
+  <section id="dist-sec" hidden>
+    <h2>분배: 피용자보수 vs 영업잉여</h2>
+    <p class="sub">경상 GDP 전년동기비(%)의 소득 항목별 기여도(%p) = 전년 소득 비중 × 항목 증가율</p>
+    <p class="lead" id="dist-lead"></p>
+    <div class="legend"><span><i class="key s1"></i>피용자보수</span><span><i class="key s2"></i>총영업잉여</span><span><i class="key s3"></i>순생산·수입세</span><span><i class="key dot"></i>경상 GDP</span></div>
+    <div class="chart" id="c-dist"></div>
+    <div id="dist-more"></div>
+  </section>
+
+  <section id="exp-sec" hidden>
+    <h2>지출 측 기여도</h2>
+    <p class="sub">실질 GDP 전기비(%, 계절조정)의 지출 항목별 기여도(%p) · 연한 막대 = 실시간 추정</p>
+    <p class="lead" id="exp-lead"></p>
+    <div class="legend" id="exp-legend"></div>
+    <div class="chart" id="c-exp"></div>
+    <div id="exp-more"></div>
   </section>
 
   <section>
@@ -283,7 +326,7 @@ const svgPt = (svg, W, e) => { const r = svg.getBoundingClientRect(); return { s
 // ================================================================ 헤드라인 (연간 실질·경상)
 function renderHead() {
   const A = DATA.annual, box = $("#head"); box.replaceChildren();
-  if (!A) { box.appendChild(h("p", "sub", "연간 성장률 계산에 필요한 데이터가 아직 없습니다.")); return; }
+  if (!A) { box.appendChild(h("p", "sub", "연간 성장률 계산용 데이터 미확보")); return; }
   const est = A.path.filter(p => p.real_est).map(p => +p.q.slice(5));
   const heads = h("div", "heads");
   [["실질성장률", A.real, A.real_sd, A.prev?.real, A.change?.real_from],
@@ -353,8 +396,8 @@ function renderYoY() {
   el("circle", { cx: lx, cy: ly, r: 4.5, fill: css("--main"), stroke: css("--bg"), "stroke-width": 2 }, svg);
   // 주석 + 점선 화살표 (빈 공간 쪽에 배치)
   const ch = A.change;
-  const ann = ch ? [`${A.year}년 실질성장률 추정치가`, `${ch.real_from.toFixed(1)}%에서 ${A.real.toFixed(1)}%로`, ch.real_from <= A.real ? "높아졌습니다" : "낮아졌습니다"]
-                 : [`${A.year}년 실질성장률`, `${A.real.toFixed(1)}%, 경상 ${A.nominal.toFixed(1)}%로`, "추정됩니다"];
+  const ann = ch ? [`${A.year}년 실질성장률 추정치`, `${ch.real_from.toFixed(1)}% → ${A.real.toFixed(1)}%`, ch.real_from <= A.real ? "상향" : "하향"]
+                 : [`${A.year}년 추정치`, `실질 ${A.real.toFixed(1)}%`, `경상 ${A.nominal.toFixed(1)}%`];
   // MCT처럼 플롯 위 오른쪽에 문장 → 점선이 오른쪽 가장자리를 타고 내려와 마지막 점을 가리킴
   const tx = W - 30, ty = 14;
   ann.forEach((s, i) => txt(svg, tx, ty + i * 17, s, { "text-anchor": "end", class: "ann" }));
@@ -408,7 +451,7 @@ function renderQHead() {
   box.appendChild(h("div", "q-n", `오차범위 ${fmt(U(t.band[0]), UD())} ~ ${fmt(U(t.band[1]), UD())}% · ${UNIT === "ann" ? "전기비 " + fmt(t.nowcast) : "연율 " + fmt(annz(t.nowcast), 1)}%`));
   box.appendChild(h("span", "pill", ["분기 내 실적 없음 — 전망 성격", "1개월 실적 반영", "2개월 실적 반영", "3개월 실적 모두 반영"][t.months_known]));
   box.appendChild(h("span", "pill", `직전 발표 ${DATA.gdp.last_quarter.replace("Q", "년 ")}분기 ${fmt(U(DATA.gdp.last_value), UD())}%`));
-  if (t.months_known === 0) box.appendChild(h("div", "warn", "이 분기는 아직 월간 실적이 없어 AR 외삽과 심리지수에 기댄 값입니다. 첫 달 산업활동동향이 나오면 크게 움직일 수 있습니다."));
+  if (t.months_known === 0) box.appendChild(h("div", "warn", "월간 실적 0개월 → AR 외삽·심리지수 기반 값. 첫 달 산업활동동향 발표 시 큰 폭 변동 가능"));
 }
 
 function renderGDP() {
@@ -482,7 +525,7 @@ function renderChange() {
   const t = DATA.targets[cur], box = $("#chg"); box.replaceChildren();
   box.appendChild(h("h3", "", "최근 갱신의 변동 요인"));
   const c = t.last_change;
-  if (!c || c.from == null) { box.appendChild(h("p", "sub", "첫 추정입니다. 다음 지표 발표부터 변동 요인이 표시됩니다.")); return; }
+  if (!c || c.from == null) { box.appendChild(h("p", "sub", "첫 추정. 다음 지표 발표부터 변동 요인 표시")); return; }
   const nNew = U(t.nowcast), nOld = U(c.from), d = nNew - nOld;
   const fx = Math.abs(t.nowcast - c.from) > 1e-6 ? d / (t.nowcast - c.from) : scaleFor(t.nowcast);
   box.appendChild(h("p", "sub", `${kst(c.at, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 갱신 · ${c.new_data.length ? "새로 반영: " + c.new_data.join(", ") : "지표 수정·보간 변화"}`));
@@ -496,7 +539,7 @@ function renderHist() {
   const t = DATA.targets[cur];
   $("#hist-sub").textContent = `${t.label} 실질 ${UNAME()}(%) · 갱신 시점별, 파란 띠 = 현재 정보량의 오차범위`;
   const pts = t.history.map(p => ({ t: new Date(p.at), v: U(p.v) }));
-  if (pts.length < 2) { box.appendChild(h("p", "sub", "갱신이 두 번 이상 쌓이면 추이가 그려집니다.")); return; }
+  if (pts.length < 2) { box.appendChild(h("p", "sub", "갱신 2회 이상 누적 시 추이 표시")); return; }
   const sd = Math.abs(U(t.band[1]) - U(t.band[0])) / 2;
   const W = box.clientWidth || 340, H = 170, m = { t: 12, r: 48, b: 22, l: 30 };
   const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "추정치 추이" }, box);
@@ -578,6 +621,149 @@ function renderChip() {
   hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
 }
 
+// ================================================================ 부가 분석 공통: 누적 막대
+const qlab = (q) => `'${q.slice(2, 4)}.${q.slice(5)}Q`;
+function stackBars(box, rows, series, opts = {}) {
+  box.replaceChildren();
+  const W = box.clientWidth || 340, H = opts.H || 220, m = { t: 14, r: 8, b: 24, l: 34 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": opts.aria || "" }, box);
+  const stacks = rows.map(r => {
+    let up = 0, dn = 0;
+    return series.map(S => { const v = r[S.k] || 0; const seg = v >= 0 ? [up, up += v] : [dn, dn += v]; return { S, v, a: seg[0], b: seg[1] }; });
+  });
+  const ext = rows.flatMap((r, i) => [r[opts.total], ...stacks[i].map(s => s.b)]).filter(v => v != null);
+  const ticks = niceTicks(Math.min(0, ...ext), Math.max(0, ...ext), 4);
+  const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks[ticks.length - 1] - ticks[0]));
+  grid(svg, ticks, Y, m.l, W - m.r, ticks[1] - ticks[0] < 1 ? 1 : 0);
+  const band = (W - m.l - m.r) / rows.length, bw = Math.min(30, band * 0.62), tip = tipFor(box);
+  rows.forEach((r, i) => {
+    const x = m.l + band * i + (band - bw) / 2, g = el("g", { tabindex: 0 }, svg), op = r.est ? 0.45 : 1;
+    stacks[i].forEach(sg => {
+      if (Math.abs(sg.v) < 1e-9) return;
+      el("rect", { x, width: bw, y: Math.min(Y(sg.a), Y(sg.b)), height: Math.max(0.5, Math.abs(Y(sg.a) - Y(sg.b))),
+        fill: css(sg.S.c), opacity: op, stroke: css("--bg"), "stroke-width": 1 }, g);
+    });
+    if (r[opts.total] != null) el("circle", { cx: x + bw / 2, cy: Y(r[opts.total]), r: 4.5, fill: css("--ink"), stroke: css("--bg"), "stroke-width": 2 }, g);
+    if (r.est) { el("rect", { x: m.l + band * i, y: m.t, width: band, height: H - m.t - m.b, fill: "none" }, g); txt(svg, x + bw / 2, m.t - 3, "추정", { "text-anchor": "middle", "font-size": 10.5 }); }
+    txt(svg, x + bw / 2, H - 7, qlab(r.q), { "text-anchor": "middle" });
+    el("rect", { x: m.l + band * i, y: 0, width: band, height: H, fill: "transparent" }, g);
+    const show = () => {
+      const k = box.clientWidth / W;
+      const ls = [{ v: `${r.q.replace("Q", "년 ")}분기${r.est ? " (추정)" : ""}` }, { v: fmt(r[opts.total]) + "%", k: opts.totalName, strong: true }];
+      series.slice().reverse().forEach(S => ls.push({ v: fmt(r[S.k]) + "%p", k: S.name, key: css(S.c) }));
+      if (opts.extra) opts.extra(r).forEach(x => ls.push(x));
+      tip.show(ls, (x + bw / 2) * k, m.t * k + 10);
+    };
+    g.addEventListener("pointerenter", show); g.addEventListener("focus", show);
+    g.addEventListener("pointerleave", tip.hide); g.addEventListener("blur", tip.hide);
+  });
+}
+function smallTable(headers, rows) {
+  const t = h("table"), r0 = h("tr"); headers.forEach(x => r0.appendChild(h("th", "", x))); t.appendChild(r0);
+  rows.forEach(r => { const tr = h("tr"); r.forEach((c, i) => { const td = h("td", c && c.est ? "est" : "", c && typeof c === "object" ? c.v : c); tr.appendChild(td); }); t.appendChild(tr); });
+  return t;
+}
+
+// ================================================================ ❹ 실질 GDP vs 실질 GNI
+function renderGNI() {
+  const G = DATA.gni, sec = $("#gni-sec");
+  sec.hidden = !G || !G.rows || G.rows.length < 4; if (sec.hidden) return;
+  const tiles = $("#gni-tiles"); tiles.replaceChildren();
+  if (G.annual) {
+    const a = G.annual, tl = h("div", "tiles");
+    [[`${a.year}년 실질 GDP`, fmt(a.gdp, 1, false), "%", "생산 측 추정"], [`${a.year}년 실질 GNI`, "≈" + fmt(a.gni, 1, false), "%", `${a.n_actual}분기 발표+추정`],
+     ["차이", fmt(a.gap, 1), "%p", "교역조건 효과 등"]].forEach(([l, v, u, n]) => {
+      const c = h("div"); c.appendChild(h("div", "t-l", l)); const vv = h("div", "t-v", v); vv.appendChild(h("small", "", u)); c.appendChild(vv); c.appendChild(h("div", "t-n", n)); tl.appendChild(c);
+    });
+    tiles.appendChild(tl);
+  }
+  const rows = G.rows, n = rows.length, box = $("#c-gni"); box.replaceChildren();
+  const W = box.clientWidth || 340, H = 220, m = { t: 12, r: 40, b: 22, l: 30 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "실질 GDP와 실질 GNI 전년동기비" }, box);
+  const ticks = niceTicks(Math.min(0, ...rows.flatMap(r => [r.gdp, r.gni])), Math.max(...rows.flatMap(r => [r.gdp, r.gni])));
+  const X = i => m.l + (W - m.l - m.r) * i / (n - 1);
+  const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks[ticks.length - 1] - ticks[0]));
+  grid(svg, ticks, Y, m.l, W - m.r);
+  el("path", { d: "M" + rows.map((r, i) => `${X(i)},${Y(r.gni)}`).join("L") + "L" + rows.map((r, i) => `${X(i)},${Y(r.gdp)}`).reverse().join("L") + "Z", fill: css("--band2"), opacity: .9 }, svg);
+  const s0 = rows.findIndex(r => r.est);
+  if (s0 > 0) { el("line", { x1: X(s0 - 1), x2: X(s0 - 1), y1: m.t, y2: H - m.b, stroke: css("--axis"), "stroke-dasharray": "2 3" }, svg); txt(svg, X(s0 - 1) + 4, m.t + 10, "추정", { "font-size": 10.5 }); }
+  const seg = (k, c, w) => {
+    const cut = s0 > 0 ? s0 - 1 : n - 1;
+    el("path", { d: rows.slice(0, cut + 1).map((r, i) => `${i ? "L" : "M"}${X(i)},${Y(r[k])}`).join(""), fill: "none", stroke: c, "stroke-width": w, "stroke-linejoin": "round" }, svg);
+    if (s0 > 0) el("path", { d: rows.slice(cut).map((r, j) => `${j ? "L" : "M"}${X(cut + j)},${Y(r[k])}`).join(""), fill: "none", stroke: c, "stroke-width": w, "stroke-dasharray": "5 4" }, svg);
+  };
+  seg("gni", css("--cmp1"), 2); seg("gdp", css("--main"), 2.5);
+  const L = rows[n - 1];
+  [["gni", css("--cmp1")], ["gdp", css("--main")]].forEach(([k, c]) => el("circle", { cx: X(n - 1), cy: Y(L[k]), r: 4, fill: c, stroke: css("--bg"), "stroke-width": 2 }, svg));
+  if (Math.abs(Y(L.gni) - Y(L.gdp)) > 14) [["gni"], ["gdp"]].forEach(([k]) => txt(svg, X(n - 1) + 7, Y(L[k]) + 4, fmt(L[k], 1, false), { class: "lbl" }));
+  rows.forEach((r, i) => { if (r.q.endsWith("Q1")) txt(svg, X(i), H - 6, `'${r.q.slice(2, 4)}`, { "text-anchor": "middle" }); });
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), opacity: 0 }, svg), tip = tipFor(box);
+  const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", e => {
+    const { sx, k } = svgPt(svg, W, e);
+    const i = Math.max(0, Math.min(n - 1, Math.round((sx - m.l) / (W - m.l - m.r) * (n - 1)))), r = rows[i];
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", 1);
+    tip.show([{ v: r.q.replace("Q", "년 ") + "분기" + (r.est ? " (추정)" : "") }, { v: fmt(r.gdp, 1) + "%", k: "실질 GDP", key: css("--main"), strong: true },
+      { v: fmt(r.gni, 1) + "%", k: "실질 GNI", key: css("--cmp1"), strong: true }, { v: fmt(r.gap, 1) + "%p", k: "차이" },
+      { v: r.tot == null ? "–" : fmt(r.tot, 1) + "%", k: "교역조건" + (r.est && r.tot_months === 0 ? "(직전값)" : "") }], X(i) * k, (m.t + 30) * k);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
+  const more = $("#gni-more"); more.replaceChildren();
+  const d = h("details"); d.appendChild(h("summary", "", "분기별 수치 (전년동기비, %)"));
+  d.appendChild(smallTable(["분기", "실질 GDP", "실질 GNI", "차이", "교역조건"],
+    rows.slice(-8).reverse().map(r => [qlab(r.q) + (r.est ? "*" : ""), { v: fmt(r.gdp, 1), est: r.est }, { v: fmt(r.gni, 1), est: r.est }, { v: fmt(r.gap, 1), est: r.est }, r.tot == null ? "–" : fmt(r.tot, 1)])));
+  d.appendChild(h("p", "note", `* 추정: 실질 GDP(실시간 추정) + 차이 추정. 차이 = ${G.fit.a.toFixed(2)} + ${G.fit.b.toFixed(2)} × 교역조건(수출물가÷수입물가, 원화) 전년동기비 · R² ${G.fit.r2.toFixed(2)}, ${G.fit.n}개 분기. 연간 GNI는 분기 차이 평균을 더한 근사치`));
+  more.appendChild(d);
+}
+
+// ================================================================ ❺ 분배
+function renderDist() {
+  const D = DATA.dist, sec = $("#dist-sec");
+  sec.hidden = !D || !D.rows || !D.rows.length; if (sec.hidden) return;
+  const rows = D.rows.slice(-8), L = rows[rows.length - 1];
+  const S = [{ k: "c_comp", name: "피용자보수", c: "--s1" }, { k: "c_surplus", name: "총영업잉여", c: "--s2" }, { k: "c_tax", name: "순생산·수입세", c: "--s3" }];
+  const lead = $("#dist-lead"); lead.replaceChildren();
+  lead.appendChild(h("b", "", `${L.q.replace("Q", "년 ")}분기 경상 GDP ${fmt(L.gdp_n, 1)}%`));
+  lead.appendChild(document.createTextNode(` → 영업잉여 ${fmt(L.c_surplus, 1)}%p · 피용자보수 ${fmt(L.c_comp, 1)}%p · 세금 ${fmt(L.c_tax, 1)}%p (증가율: 영업잉여 ${fmt(L.g_surplus, 1)}%, 피용자보수 ${fmt(L.g_comp, 1)}%)`));
+  stackBars($("#c-dist"), rows, S, { total: "gdp_n", totalName: "경상 GDP", aria: "경상 GDP 소득 항목별 기여도",
+    extra: r => [{ v: `증가율 보수 ${fmt(r.g_comp, 1)}% · 잉여 ${fmt(r.g_surplus, 1)}% · 세금 ${fmt(r.g_tax, 1)}%`, cls: "k" }] });
+  const more = $("#dist-more"); more.replaceChildren();
+  const d = h("details"); d.appendChild(h("summary", "", "항목별 증가율·소득 비중"));
+  d.appendChild(smallTable(["분기", "경상 GDP", "보수", "영업잉여", "세금"],
+    rows.slice().reverse().map(r => [qlab(r.q), fmt(r.gdp_n, 1), fmt(r.g_comp, 1), fmt(r.g_surplus, 1), fmt(r.g_tax, 1)])));
+  const sh = D.share.slice(-6);
+  d.appendChild(h("p", "note", "소득 비중(명목 GDP 대비 %, 연간): " + sh.map(x => `${x.y} 보수 ${x.comp}·잉여 ${x.surplus}·세금 ${x.tax}`).join(" / ")));
+  d.appendChild(h("p", "note", "총영업잉여 = 영업잉여(혼합소득 포함) + 고정자본소모 · 기여도 합과 경상 GDP 증가율의 차이는 비중 변화에 따른 근사 오차"));
+  more.appendChild(d);
+}
+
+// ================================================================ ❻ 지출 측
+function renderExp() {
+  const E = DATA.expenditure, sec = $("#exp-sec");
+  sec.hidden = !E || !E.rows || !E.rows.length; if (sec.hidden) return;
+  const cols = { pc: "--s1", gc: "--s2", ci: "--s3", ei: "--s4", nx: "--s5", other: "--cmp2" };
+  const S = E.order.map(k => ({ k, name: E.labels[k], c: cols[k] }));
+  const lg = $("#exp-legend"); lg.replaceChildren();
+  S.forEach(x => { const sp = h("span"), k = h("i", "key"); k.style.background = `var(${x.c})`; sp.appendChild(k); sp.appendChild(document.createTextNode(x.name)); lg.appendChild(sp); });
+  const sp = h("span"); sp.appendChild(h("i", "key dot")); sp.appendChild(document.createTextNode("GDP")); lg.appendChild(sp);
+  const lead = $("#exp-lead"); lead.replaceChildren();
+  const est = E.rows.filter(r => r.est);
+  est.forEach(r => {
+    const p = h("div"); p.appendChild(h("b", "", `${r.q.replace("Q", "년 ")}분기 지출 측 합산 ${fmt(r.gdp)}%`));
+    p.appendChild(document.createTextNode(` vs 생산 측(헤드라인) ${fmt(r.prod)}% → 차이 ${fmt(r.gdp - r.prod)}%p`));
+    lead.appendChild(p);
+  });
+  stackBars($("#c-exp"), E.rows, S, { total: "gdp", totalName: "실질 GDP", aria: "실질 GDP 지출 항목별 기여도",
+    extra: r => r.est ? [{ v: `생산 측 ${fmt(r.prod)}%`, cls: "k" }] : [] });
+  const more = $("#exp-more"); more.replaceChildren();
+  const d = h("details"); d.appendChild(h("summary", "", "지출 항목 브리지 (항목 전기비 ← 월간 지표)"));
+  const g = est.length ? est[est.length - 1].growth : {};
+  d.appendChild(smallTable(["항목", "지표", "계수", "R²", est.length ? `${qlab(est[est.length - 1].q)} 추정` : ""],
+    Object.entries(E.bridge).map(([k, b]) => [E.comp_labels[k], E.ind_labels[b.ind] || b.ind, b.coef.toFixed(2), b.r2.toFixed(2), { v: g[k] != null ? fmt(g[k], 1) + "%" : "", est: true }])));
+  d.appendChild(h("p", "note", `기타(지식재산투자·재고증감·통계상 불일치) = 최근 8개 분기 평균 기여 ${fmt(E.other_mean)}%p로 고정 · 순수출 = 수출 − 수입 · 헤드라인은 생산 측 추정, 지출 측은 교차 점검용`));
+  more.appendChild(d);
+}
+
 // ================================================================ 정확도·방법
 function renderBT() {
   const b = DATA.backtest, D = DATA.deflator, tbl = $("#bt"); tbl.replaceChildren();
@@ -592,7 +778,7 @@ function renderBT() {
     DATA.actuals.slice().reverse().forEach(a => { const r = h("tr"); [a.q, fmt(a.final_nowcast), fmt(a.advance), fmt(a.advance - a.final_nowcast)].forEach(s => r.appendChild(h("td", "", s))); t2.appendChild(r); });
     d.appendChild(t2); act.appendChild(d);
   }
-  act.appendChild(h("p", "note", "백테스트는 개정된 최종 통계로 계산해 실제 실시간 오차보다 작게 나옵니다. 실전 오차는 '속보치와 비교'가 쌓이면서 드러납니다."));
+  act.appendChild(h("p", "note", "백테스트: 개정 후 최종 통계 기준 → 실제 실시간 오차보다 과소. 실전 오차는 '속보치와 비교' 누적으로 확인"));
 }
 function renderMethod() {
   const B = DATA.bridge, D = DATA.deflator, ul = $("#method"); ul.replaceChildren();
@@ -622,11 +808,23 @@ function renderMethod() {
     ["계수 재추정", [
       "GDP 신규 발표·개정 시에만",
       "분기 중 추정치 변동 → 전부 지표 기여로 분해"]],
+    DATA.gni && ["실질 GNI (교역조건)", [
+      "실질 GNI − 실질 GDP = 교역조건 효과(실질무역손익) + 국외순수취요소소득",
+      `차이 = ${DATA.gni.fit.a.toFixed(2)} + ${DATA.gni.fit.b.toFixed(2)} × 교역조건(수출물가÷수입물가, 원화) 전년동기비 · R² ${DATA.gni.fit.r2.toFixed(2)}`,
+      "추정 분기: 실질 GDP 실시간 추정 + 추정 차이"]],
+    DATA.dist && ["분배 (소득 측)", [
+      "경상 GDP = 피용자보수 + 총영업잉여 + 순생산·수입세",
+      "기여도 = 전년 소득 비중(한은 연간 국민계정) × 항목 전년동기비",
+      "한은 발표 분기만 표시(추정 없음)"]],
+    DATA.expenditure && ["지출 측 교차 점검", [
+      "기여도 = Δ실질 수준(계절조정) ÷ 전기 GDP",
+      "추정 분기: 항목별 브리지 — 민간소비←서비스업생산, 정부소비←공공행정, 건설투자←건설업생산, 설비투자←설비투자지수, 수출←실질수출, 수입←수입물량",
+      "헤드라인은 생산 측 유지 → 두 방식 차이 = 추정 불확실성 신호"]],
     ["분기 연율(SAAR)", [
       "(1 + 전기비)⁴ − 1",
       "한은 공식 발표는 전기비"]],
   ];
-  items.forEach(([t, subs]) => {
+  items.filter(Boolean).forEach(([t, subs]) => {
     const li = h("li"); li.appendChild(h("b", "", t));
     const sub = h("ul"); subs.filter(Boolean).forEach(x => sub.appendChild(h("li", "", x)));
     li.appendChild(sub); ul.appendChild(li);
@@ -641,7 +839,7 @@ function renderEvo() {
   if (!A) return;
   $("#evo-h").textContent = `${A.year}년 성장률 추정치 변화`;
   const hist = (A.history || []).filter(p => p.real != null);
-  if (!hist.length) { box.appendChild(h("p", "sub", "갱신이 쌓이면 추이가 그려집니다.")); return; }
+  if (!hist.length) { box.appendChild(h("p", "sub", "갱신 누적 시 추이 표시")); return; }
   const pts = hist.map(p => ({ t: new Date(p.at), real: p.real, nom: p.nominal,
     rsd: p.real_sd ?? A.real_sd, nsd: p.nom_sd ?? A.nom_sd, new: p.new || [] }));
   const tEnd = Math.max(+new Date(DATA.generated_at), +pts[pts.length - 1].t);
@@ -711,10 +909,10 @@ function renderEvo() {
     t.appendChild(tr);
   });
   box.appendChild(t);
-  if (pts.length < 3) box.appendChild(h("p", "note", "아직 갱신 이력이 짧다. 지표가 발표될 때마다 한 칸씩 쌓인다."));
+  if (pts.length < 3) box.appendChild(h("p", "note", "갱신 이력 짧음. 지표 발표마다 한 칸씩 누적"));
 }
 
-function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderBT(); renderMethod(); }
+function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderGNI(); renderDist(); renderExp(); renderBT(); renderMethod(); }
 if (DATA) {
   $("#badge").textContent = kst(DATA.generated_at, { year: "numeric", month: "long", day: "numeric" }) + " 업데이트";
   $("#lede").textContent = `${DATA.annual ? DATA.annual.year : new Date().getFullYear()}년 경제성장률 실시간 추정(비공식)`;
