@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from . import adjust, ecos, extras, model
+from . import adjust, ecos, extras, model, releases
 
 ROOT = Path(__file__).resolve().parent.parent
 KST = timezone(timedelta(hours=9))
@@ -399,6 +399,14 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         for e in ext["errors"]:
             print(f"::warning::부가 분석 일부 생략 — {e}")
 
+    upcoming = []
+    rel_path = ROOT / "config" / "releases.yaml"
+    if rel_path.exists():
+        try:
+            upcoming = releases.upcoming(yaml.safe_load(rel_path.read_text()), now, bt["rmse"])
+        except Exception as e:  # noqa: BLE001
+            print(f"::warning::발표 일정 생략 — {type(e).__name__} {e}")
+
     g = gdp.dropna()
     payload = {
         "generated_at": now.isoformat(timespec="minutes"),
@@ -419,6 +427,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         "chips": chips,
         "esi": {"last": str(esi.index.max()), "value": r(esi.iloc[-1], 1)},
         "gni": ext["gni"], "dist": ext["dist"], "expenditure": ext["exp"],
+        "releases": upcoming,
     }
     (site_dir / "nowcast.json").write_text(json.dumps(payload, ensure_ascii=False))
     tpl = (ROOT / "web" / "index.html").read_text()
