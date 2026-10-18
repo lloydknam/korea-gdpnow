@@ -149,6 +149,16 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 .key.dot{width:9px;height:9px;border-radius:50%;background:var(--ink);border:2px solid var(--bg);box-sizing:content-box}
 .key.gni{height:0;border-top:2.5px solid var(--cmp1);margin-top:6px}
 .lead{font-size:13.5px;margin:4px 0 10px}
+.cal{list-style:none;margin:6px 0 0;padding:0}
+.cal li{display:grid;grid-template-columns:62px 1fr;gap:2px 12px;padding:9px 0;border-bottom:1px solid var(--grid)}
+.cal li:last-child{border-bottom:0}
+.cal .d{font-weight:800;font-variant-numeric:tabular-nums;font-size:14px;line-height:1.3}
+.cal .d small{display:block;font-weight:500;font-size:11.5px;color:var(--ink-3)}
+.cal .n{font-size:14px;font-weight:700;line-height:1.3}
+.cal .n span{font-weight:500;color:var(--ink-2);font-size:12px;margin-left:4px}
+.cal .i{grid-column:2;font-size:12.5px;color:var(--ink-2)}
+.cal .tag{display:inline-block;font-size:10.5px;padding:0 5px;margin-left:5px;border:1px solid var(--axis);color:var(--ink-3);font-weight:500;vertical-align:1px}
+.cal li.big .n{color:var(--head)}
 .lead b{font-weight:800}
 </style>
 </head>
@@ -192,6 +202,12 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
     <h3>추정치 변화</h3>
     <p class="sub" id="hist-sub"></p>
     <div class="chart" id="c-hist"></div>
+  </section>
+
+  <section id="cal-sec" hidden>
+    <h2>다음 발표 일정</h2>
+    <p class="sub">평일 하루 4회 자동 갱신(04:07·09:15·12:40·17:30) → 발표 당일 반영, 주말 발표는 다음 평일 · '예상' = 통상 일정 기준 추정 날짜</p>
+    <ul class="cal" id="cal"></ul>
   </section>
 
   <section>
@@ -346,6 +362,12 @@ function renderHead() {
     ` · 연간(전년비) 기준. 실질은 ${est.length ? (4 - est.length) + "개 분기 발표 + " + est.map(q => q + "분기").join("·") + " 실시간 추정" : "4개 분기 모두 발표"}, ` +
     `명목은 ${A.nominal_last.replace("Q", "년 ")}분기까지 발표.`));
   box.appendChild(m);
+  const nx = (DATA.releases || [])[0];
+  if (nx) {
+    const p = h("div", "h-meta"); p.appendChild(h("b", "", "다음 갱신 "));
+    p.appendChild(document.createTextNode(`${+nx.date.slice(5, 7)}/${+nx.date.slice(8)}(${nx.dow}) ${nx.name}${nx.est ? " (예상)" : ""}`));
+    p.style.marginTop = "4px"; box.appendChild(p);
+  }
   const d = h("details"); d.appendChild(h("summary", "", `${A.year}년 분기 경로 (전기비, %)`));
   const t = h("table"), r0 = h("tr"); ["분기", "실질", "디플레이터", "명목"].forEach(s => r0.appendChild(h("th", "", s))); t.appendChild(r0);
   A.path.forEach(p => {
@@ -774,6 +796,30 @@ function renderExp() {
   more.appendChild(d);
 }
 
+
+// ================================================================ 다음 발표 일정
+const CAL_IMPACT = {
+  customs_d10: "실질수출 속보 (반영 비중 50%)", customs_d20: "실질수출 속보 (반영 비중 80%)", customs_m: "실질수출 월 잠정치",
+  prices: "수출입물가 → 디플레이터·경상성장률 · 수출물량지수 실적", cpi: "소비자물가 → 디플레이터", esi: "미발표 달 보간(심리지수)",
+};
+function renderCal() {
+  const R = DATA.releases || [], sec = $("#cal-sec"), ul = $("#cal"); ul.replaceChildren();
+  sec.hidden = !R.length; if (!R.length) return;
+  R.forEach(e => {
+    const li = h("li", e.key === "activity" || e.key === "gdp_adv" ? "big" : "");
+    const d = h("div", "d", `${+e.date.slice(5, 7)}/${+e.date.slice(8)} ${e.dow}`); d.appendChild(h("small", "", e.time || "")); li.appendChild(d);
+    const n = h("div", "n", e.name); n.appendChild(h("span", "", `${e.org} · ${e.ref}`));
+    if (e.est) n.appendChild(h("span", "tag", "예상"));
+    li.appendChild(n);
+    let imp = CAL_IMPACT[e.key] || "";
+    if (e.key === "activity") imp = e.impact
+      ? `광공업·서비스업·건설업·공공행정 → ${e.impact.quarter.replace("Q", "년 ")}분기 실적 ${e.impact.k_from}→${e.impact.k_to}개월, 오차 ±${e.impact.rmse_from.toFixed(2)} → ±${e.impact.rmse_to.toFixed(2)}%p(전기비)`
+      : "광공업·서비스업·건설업·공공행정 실적";
+    if (e.key === "gdp_adv") imp = `${e.ref} 실적 확정 → 추정치 채점, 계수 재추정, 연간 재계산`;
+    li.appendChild(h("div", "i", imp));
+    ul.appendChild(li);
+  });
+}
 // ================================================================ 정확도·방법
 function renderBT() {
   const b = DATA.backtest, D = DATA.deflator, tbl = $("#bt"); tbl.replaceChildren();
@@ -926,7 +972,7 @@ function renderEvo() {
   if (pts.length < 3) box.appendChild(h("p", "note", "갱신 이력 짧음. 지표 발표마다 한 칸씩 누적"));
 }
 
-function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderGNI(); renderDist(); renderExp(); renderBT(); renderMethod(); }
+function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderGNI(); renderDist(); renderExp(); renderCal(); renderBT(); renderMethod(); }
 if (DATA) {
   $("#badge").textContent = kst(DATA.generated_at, { year: "numeric", month: "long", day: "numeric" }) + " 업데이트";
   $("#lede").textContent = `${DATA.annual ? DATA.annual.year : new Date().getFullYear()}년 경제성장률 실시간 추정(비공식)`;
