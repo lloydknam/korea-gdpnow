@@ -46,6 +46,7 @@ body{font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFo
 main{max-width:640px;margin:0 auto}
 .badge{display:inline-block;background:var(--badge);color:#fff;font-weight:800;font-size:15px;letter-spacing:.02em;padding:5px 14px;margin:0 0 10px}
 h1{font-size:32px;font-weight:800;letter-spacing:-.035em;line-height:1.1;margin:0}
+h1 i{font-family:Georgia,"Times New Roman","Nanum Myeongjo",serif;font-style:italic;font-weight:700;letter-spacing:-.01em}
 .lede{font-size:18px;color:var(--ink);margin:4px 0 18px}
 section{border-top:1px solid var(--rule);padding:18px 0 20px}
 h2{font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin:0;color:var(--head)}
@@ -132,9 +133,11 @@ summary{cursor:pointer;font-size:13px;color:var(--ink-2);padding:4px 0}
 .note ul ul{margin:2px 0 6px;padding-left:16px;list-style:'– '}
 .note ul ul li{margin:1px 0}
 footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
-.inst{font-family:Georgia,"Times New Roman","Nanum Myeongjo",serif;font-size:15px;letter-spacing:.32em;color:var(--ink-2);text-transform:uppercase}
+.inst{font-family:Georgia,"Times New Roman","Nanum Myeongjo",serif;font-size:30px;font-weight:700;letter-spacing:.14em;line-height:1.2;color:var(--ink);text-transform:uppercase}
 .inst i{font-style:italic;letter-spacing:.05em;text-transform:none}
 .credit{font-size:11.5px;color:var(--ink-3);margin-top:6px}
+.contact{font-size:12px;margin-top:3px}
+.contact a{color:var(--ink-2);text-decoration:none;border-bottom:1px solid var(--rule)}
 .hits{display:inline-block;margin-top:12px;line-height:0}
 .hits img{height:20px;width:auto}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:8px 0 12px}
@@ -165,7 +168,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 <body>
 <main>
   <div class="badge" id="badge"></div>
-  <h1>Korea GDP Now</h1>
+  <h1>Korea GDP <i>Now</i></h1>
   <p class="lede" id="lede"></p>
 
   <section id="head"></section>
@@ -266,6 +269,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
   <footer>
     <div class="inst">Korea GDP <i>Now</i></div>
     <div class="credit">데이터: 한국은행 ECOS · 통계청 · 관세청 &nbsp;|&nbsp; 공식 전망 아님</div>
+    <div class="contact"><a href="mailto:lloydnam@gmail.com">lloydnam@gmail.com</a></div>
     <a class="hits" href="https://hits.sh/lloydknam.github.io/korea-gdpnow/" aria-label="방문자 수">
       <img src="https://hits.sh/lloydknam.github.io/korea-gdpnow.svg?view=today-total&amp;style=flat-square&amp;label=%EC%98%A4%EB%8A%98%20%2F%20%EC%A0%84%EC%B2%B4%20%EB%B0%A9%EB%AC%B8&amp;color=%23135f8c&amp;labelColor=%234a5057" alt="방문자 수" height="20" loading="lazy">
     </a>
