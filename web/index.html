@@ -119,7 +119,7 @@ h3{font-size:15px;font-weight:800;letter-spacing:-.02em;margin:22px 0 2px}
 
 table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
 th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--grid)}
-th:first-child,td:first-child{text-align:left}
+th:first-child,td:first-child{text-align:left;white-space:nowrap}
 th{font-weight:700;color:var(--ink-2);font-size:12px;border-bottom:1px solid var(--axis)}
 tr:last-child td{border-bottom:0}
 td.est{color:var(--main);font-weight:600}
@@ -228,7 +228,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 
   <section id="exp-sec" hidden>
     <h2>지출 측 기여도</h2>
-    <p class="sub">실질 GDP 전기비(%, 계절조정)의 지출 항목별 기여도(%p) · 연한 막대 = 실시간 추정</p>
+    <p class="sub">실질 GDP 전기비(%, 계절조정)의 지출 항목별 기여도(%p) · 빗금 막대 = 실시간 추정</p>
     <p class="lead" id="exp-lead"></p>
     <div class="legend" id="exp-legend"></div>
     <div class="chart" id="c-exp"></div>
@@ -636,12 +636,19 @@ function stackBars(box, rows, series, opts = {}) {
   const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks[ticks.length - 1] - ticks[0]));
   grid(svg, ticks, Y, m.l, W - m.r, ticks[1] - ticks[0] < 1 ? 1 : 0);
   const band = (W - m.l - m.r) / rows.length, bw = Math.min(30, band * 0.62), tip = tipFor(box);
+  // 추정 막대: 같은 색 사선 빗금 (밝기만 낮추면 어두운 화면에서 색이 탁해짐)
+  const defs = el("defs", {}, svg), pid = k => `${box.id}-h-${k}`;
+  series.forEach(S => {
+    const pt = el("pattern", { id: pid(S.k), width: 5, height: 5, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, defs);
+    el("rect", { width: 5, height: 5, fill: css(S.c), opacity: .28 }, pt);
+    el("line", { x1: 0, y1: 0, x2: 0, y2: 5, stroke: css(S.c), "stroke-width": 2.6 }, pt);
+  });
   rows.forEach((r, i) => {
-    const x = m.l + band * i + (band - bw) / 2, g = el("g", { tabindex: 0 }, svg), op = r.est ? 0.45 : 1;
+    const x = m.l + band * i + (band - bw) / 2, g = el("g", { tabindex: 0 }, svg);
     stacks[i].forEach(sg => {
       if (Math.abs(sg.v) < 1e-9) return;
       el("rect", { x, width: bw, y: Math.min(Y(sg.a), Y(sg.b)), height: Math.max(0.5, Math.abs(Y(sg.a) - Y(sg.b))),
-        fill: css(sg.S.c), opacity: op, stroke: css("--bg"), "stroke-width": 1 }, g);
+        fill: r.est ? `url(#${pid(sg.S.k)})` : css(sg.S.c), stroke: css("--bg"), "stroke-width": 1 }, g);
     });
     if (r[opts.total] != null) el("circle", { cx: x + bw / 2, cy: Y(r[opts.total]), r: 4.5, fill: css("--ink"), stroke: css("--bg"), "stroke-width": 2 }, g);
     if (r.est) { el("rect", { x: m.l + band * i, y: m.t, width: band, height: H - m.t - m.b, fill: "none" }, g); txt(svg, x + bw / 2, m.t - 3, "추정", { "text-anchor": "middle", "font-size": 10.5 }); }
@@ -753,14 +760,17 @@ function renderExp() {
     p.appendChild(document.createTextNode(` vs 생산 측(헤드라인) ${fmt(r.prod)}% → 차이 ${fmt(r.gdp - r.prod)}%p`));
     lead.appendChild(p);
   });
+  if (est.some(r => Math.abs(r.gdp - r.prod) >= 0.5)) lead.appendChild(h("p", "note", "차이 0.5%p 이상 → 지출 측 항목 식 설명력(R² 0.3~0.6)이 생산 측보다 낮아 참고용. 헤드라인은 생산 측"));
   stackBars($("#c-exp"), E.rows, S, { total: "gdp", totalName: "실질 GDP", aria: "실질 GDP 지출 항목별 기여도",
     extra: r => r.est ? [{ v: `생산 측 ${fmt(r.prod)}%`, cls: "k" }] : [] });
   const more = $("#exp-more"); more.replaceChildren();
   const d = h("details"); d.appendChild(h("summary", "", "지출 항목 브리지 (항목 전기비 ← 월간 지표)"));
-  const g = est.length ? est[est.length - 1].growth : {};
-  d.appendChild(smallTable(["항목", "지표", "계수", "R²", est.length ? `${qlab(est[est.length - 1].q)} 추정` : ""],
-    Object.entries(E.bridge).map(([k, b]) => [E.comp_labels[k], E.ind_labels[b.ind] || b.ind, b.coef == null ? "–" : b.coef.toFixed(2), b.r2.toFixed(2), { v: g[k] != null ? fmt(g[k], 1) + "%" : "", est: true }])));
-  d.appendChild(h("p", "note", `기타(지식재산투자·재고증감·통계상 불일치) = 최근 8개 분기 평균 기여 ${fmt(E.other_mean)}%p로 고정 · 순수출 = 수출 − 수입 · 헤드라인은 생산 측 추정, 지출 측은 교차 점검용`));
+  const e0 = est.length ? est[0] : null, g = e0 ? e0.growth : {};
+  d.appendChild(smallTable(["항목", "지표", "계수", "R²", e0 ? `${qlab(e0.q)} 추정` : ""],
+    Object.entries(E.bridge).map(([k, b]) => [E.comp_labels[k], E.ind_labels[b.ind] || b.ind, b.coef == null ? "–" : b.coef.toFixed(2), b.r2.toFixed(2),
+      { v: k === "nx" ? (e0 ? fmt(e0.nx) + "%p" : "") : (g[k] != null ? fmt(g[k], 1) + "%" : ""), est: true }])));
+  if (e0 && g.x != null) d.appendChild(h("p", "note", `${qlab(e0.q)} 물량지수 전기비: 수출 ${fmt(g.x, 1)}% · 수입 ${fmt(g.m, 1)}%`));
+  d.appendChild(h("p", "note", `기타(지식재산투자·재고증감·통계상 불일치) = 최근 8개 분기 평균 기여 ${fmt(E.other_mean)}%p로 고정 · 순수출 기여 = a + b × (수출 비중×수출물량 증가율 − 수입 비중×수입물량 증가율) · 헤드라인은 생산 측 추정, 지출 측은 교차 점검용`));
   more.appendChild(d);
 }
 
@@ -820,7 +830,8 @@ function renderMethod() {
       "한은 발표 분기만 표시(추정 없음)"]],
     DATA.expenditure && ["지출 측 교차 점검", [
       "기여도 = Δ실질 수준(계절조정) ÷ 전기 GDP",
-      "추정 분기: 항목별 브리지 — 민간소비←서비스업생산, 건설투자←건설업생산, 설비투자←설비투자지수, 수출←실질수출, 수입←수입물량",
+      "추정 분기: 항목별 브리지 — 민간소비←서비스업생산, 건설투자←건설업생산, 설비투자←설비투자지수",
+      "순수출: 수출·수입물량 증가율을 비중으로 가중한 차이 하나로 추정(따로 추정하면 한쪽으로 치우침)",
       "지표 설명력(R²) 0.1 미만 항목(정부소비 등) → 최근 8분기 평균 증가율",
       "헤드라인은 생산 측 유지 → 두 방식 차이 = 추정 불확실성 신호"]],
     ["분기 연율(SAAR)", [
