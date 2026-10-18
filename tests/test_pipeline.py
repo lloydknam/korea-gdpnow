@@ -46,6 +46,15 @@ def test_pipeline(tmp_root=None):
     assert a["change"] and len(a["history"]) == 2
     yo = a["yoy"]
     assert yo[-1]["q"] == "2026Q4" and yo[-1]["real_band"] and not yo[0]["est"]
+    # 부가 분석 ❹❺❻
+    g = p2["gni"]
+    assert g and g["annual"] and any(r["est"] for r in g["rows"]) and g["fit"]["r2"] > 0.5, g and g["fit"]
+    d = p2["dist"]
+    assert d and len(d["rows"]) == 12 and abs(d["rows"][-1]["resid"]) < 3, d and d["rows"][-1]
+    e = p2["expenditure"]
+    assert e and [r["q"] for r in e["rows"] if r["est"]] == ["2026Q3", "2026Q4"]
+    for row in e["rows"]:  # 항목 기여도 합 = GDP 증가율
+        assert abs(sum(row[k] for k in e["order"]) - row["gdp"]) < 0.02, row
     html = (tmp / "site" / "index.html").read_text()
     assert "/*__DATA__*/" not in html
     return tmp, p1, p2

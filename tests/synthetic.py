@@ -55,7 +55,52 @@ def make(seed=7):
     nom = ((1 + gdp / 100) * (1 + defl / 100) - 1) * 100
     gdp, nom = gdp[gdp.index <= Q_END].dropna(), nom[(nom.index <= Q_END) & (nom.index >= pd.Period("2010Q2", "Q"))]
     m = idx <= M_END
-    return {
+    # ── 부가 분석용 (❹ GNI ❺ 분배 ❻ 지출) ──
+    qidx = gdp.index
+    lvl_gdp = 500_000 * np.exp(np.cumsum(gdp.fillna(0) / 100))
+    yoy = lambda lv: (lv / lv.shift(4) - 1) * 100
+    tot_q = (px_krw / pm_krw).groupby((px_krw / pm_krw).index.asfreq("Q")).mean()
+    tot_q.index = pd.PeriodIndex(tot_q.index, freq="Q")
+    gap = 0.35 * yoy(tot_q).reindex(qidx) + rng.normal(0.2, 0.3, len(qidx))
+    q11 = qidx >= pd.Period("2011Q1", "Q")
+    gdp_yoy = yoy(lvl_gdp)
+    nom_lvl = lvl_gdp * np.exp(np.cumsum(defl.reindex(qidx).fillna(0) / 100))
+    nom_yoy = yoy(nom_lvl)
+    comp_g = nom_yoy * 0.6 + rng.normal(1.5, 0.8, len(qidx))
+    tax_g = nom_yoy * 0.8 + rng.normal(0, 1.5, len(qidx))
+    sur_g = (nom_yoy - 0.45 * comp_g - 0.10 * tax_g) / 0.45
+    eq_m = lvl(0.25, 1.5, 2.5)
+    mv_nsa = lvl(0.3, 1.2, 1.6) * np.exp(seas[[p.month - 1 for p in idx]])
+    qg_ = lambda sm: qg(sm).reindex(qidx).fillna(0)
+    comps = {"1010110": 0.48 * np.exp(np.cumsum((0.1 + 0.8 * qg_(S["sv"]) + rng.normal(0, .3, len(qidx))) / 100)),
+             "1010120": 0.18 * np.exp(np.cumsum((0.3 + 0.9 * qg_(S["pa"]) + rng.normal(0, .3, len(qidx))) / 100)),
+             "1020111": 0.15 * np.exp(np.cumsum((0.9 * qg_(S["cn"]) + rng.normal(0, 1, len(qidx))) / 100)),
+             "1020112": 0.09 * np.exp(np.cumsum((1.0 * qg_(eq_m) + rng.normal(0, 1.5, len(qidx))) / 100)),
+             "1020113": 0.05 * np.exp(np.cumsum(rng.normal(0.8, .5, len(qidx)) / 100)),
+             "10301": 0.45 * np.exp(np.cumsum((0.35 * qg_(S["exsa"]) + rng.normal(0, .4, len(qidx))) / 100)),
+             "10401": 0.40 * np.exp(np.cumsum((0.35 * qg_(mv_nsa) + rng.normal(0, .4, len(qidx))) / 100))}
+    ex_lv = {k: pd.Series(np.asarray(v), index=qidx) * float(lvl_gdp.iloc[0]) for k, v in comps.items()}
+    inv = pd.Series(rng.normal(0, 3000, len(qidx)), index=qidx)
+    sd_ = lvl_gdp - (sum(v for k, v in ex_lv.items() if k != "10401") - ex_lv["10401"] + inv)
+    exp_out = {("200Y108", k): v[qidx >= pd.Period("2005Q1", "Q")] for k, v in
+               {**ex_lv, "1020120": inv, "10501": sd_, "10601": lvl_gdp}.items()}
+    ann = pd.period_range("2010", "2025", freq="Y")
+    base = pd.Series(np.linspace(1_200_000, 2_600_000, len(ann)), index=ann)
+    dist_ann = {"10106": base, "10101": base * 0.45, "10102": base * 0.25, "10103": base * 0.20,
+                "10104": base * 0.11, "10105": base * 0.01}
+    extras_out = {
+        ("200Y102", "10211"): gdp_yoy[q11].round(1), ("200Y102", "20122"): (gdp_yoy + gap)[q11].round(1),
+        ("200Y102", "60211"): nom_yoy[q11].round(1), ("200Y102", "60212"): comp_g[q11].round(1),
+        ("200Y102", "60213"): sur_g[q11].round(1), ("200Y102", "60214"): tax_g[q11].round(1),
+        **{("200Y113", k): v for k, v in dist_ann.items()},
+        **exp_out,
+        ("901Y066", "I15B"): eq_m[m], ("403Y004", "*AA"): mv_nsa[idx <= CPI_END],
+    }
+    for k in list(extras_out):
+        if k[0] in ("200Y102", "200Y108"):
+            extras_out[k] = extras_out[k].dropna()
+            extras_out[k] = extras_out[k][extras_out[k].index <= Q_END]
+    return {**extras_out,
         ("200Y102", "10111"): gdp.round(1), ("200Y102", "60111"): nom.round(1),
         ("901Y033", "AB00", "2"): S["ip"][m], ("901Y033", "AC00", "2"): S["sv"][m],
         ("901Y033", "AD00", "2"): S["cn"][m], ("901Y033", "AE00", "2"): S["pa"][m],
