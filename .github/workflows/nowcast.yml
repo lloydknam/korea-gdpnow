@@ -30,12 +30,12 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       # 시작 시점의 옛 커밋이 아니라 '지금의 main'을 받음 → 앞선 실행의 결과 위에서 계산
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -45,7 +45,7 @@ jobs:
       # 관세청 10일·20일·월 속보 → data/customs_flash.csv (없는 줄만 추가, 실패해도 계속)
       - name: Collect customs flash
         continue-on-error: true
-        timeout-minutes: 3
+        timeout-minutes: 6
         run: python -m nowcast.customs_scrape
 
       - name: Run nowcast
@@ -55,7 +55,7 @@ jobs:
 
       # 사이트를 먼저 배포 → 아래 커밋이 실패해도 페이지는 갱신됨
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: site
       - id: deploy
