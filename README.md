@@ -56,6 +56,10 @@ GDP 전기비_q = α + β₁·광공업_q + β₂·서비스업_q + β₃·건�
 | 분배 | 경상 GDP 전년동기비 기여도 = 전년 소득 비중(200Y113 연간) × 피용자보수·총영업잉여·순생산수입세 증가율 |
 | 지출 측 | 실질 계절조정 수준(200Y108)으로 기여도. 추정 분기는 항목별 브리지(민간소비←서비스업, 정부소비←공공행정, 건설투자←건설업, 설비투자←설비투자지수 901Y066, 수출←실질수출, 수입←수입물량 403Y004)로 합산 → 생산 측 헤드라인과 비교 |
 
+### 다음 발표 일정
+
+`config/releases.yaml`의 규칙(매월 N일·마지막 영업일·n번째 요일, 주말·공휴일은 다음 영업일)으로 날짜를 추정해 '예상'으로 표시. 공식 일정이 확인되면 `fixed:`에 날짜를 적으면 '확정'으로 바뀜(예: `gdp_adv: [2026-10-22]`).
+
 ECOS 통계코드는 `config/series.yaml`에 있음(2026-10-11 ECOS 메타데이터로 검증).
 
 ## 파일
@@ -66,6 +70,7 @@ nowcast/ecos.py           ECOS API
 nowcast/adjust.py         계절·영업일 조정, 관세청 속보 환산
 nowcast/customs_scrape.py 관세청 속보 자동 수집(정책브리핑, 막히면 웹 리더 경유)
 nowcast/extras.py         부가 분석: 실질 GNI·분배·지출 측
+nowcast/releases.py       다음 발표 일정(config/releases.yaml 규칙 + 확정일 덮어쓰기)
 nowcast/model.py          보간·브리지·백테스트
 nowcast/run.py            실행 → data/ 갱신, site/ 생성
 web/index.html            페이지 템플릿(라이브러리 없음, SVG 차트)
