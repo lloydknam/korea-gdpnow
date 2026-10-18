@@ -91,6 +91,58 @@ deflator:
       items: ["*AA", W]
       source: 한국은행
 
+# ── 부가 분석 (헤드라인과 별개, 실패해도 본 추정은 계속) ─────────────────
+extras:
+  # ❹ 실질 GNI·교역조건 / ❺ 분배: 200Y102 원계열 전년동기비(%)
+  income:
+    stat: "200Y102"
+    start: 2011Q1
+    items:
+      gdp_r: "10211"     # 실질 GDP
+      gni_r: "20122"     # 실질 GNI
+      gdp_n: "60211"     # 명목 GDP
+      comp: "60212"      # 피용자보수
+      surplus: "60213"   # 총영업잉여
+      tax: "60214"       # 순생산 및 수입세
+  # ❺ 소득별 비중(가중치): 200Y113 국내총생산과 지출(명목, 연간), 십억원
+  dist_weights:
+    stat: "200Y113"
+    start: "2010"
+    items: {gdp: "10106", comp: "10101", os: "10102", cfc: "10103", tax: "10104", sub: "10105"}
+  # ❻ 지출 측: 200Y108 국내총생산에 대한 지출(계절조정, 실질), 십억원
+  expenditure:
+    stat: "200Y108"
+    start: 2005Q1
+    items:
+      pc:  {code: "1010110", label: 민간소비}
+      gc:  {code: "1010120", label: 정부소비}
+      ci:  {code: "1020111", label: 건설투자}
+      ei:  {code: "1020112", label: 설비투자}
+      ipp: {code: "1020113", label: 지식재산투자}
+      inv: {code: "1020120", label: 재고증감}
+      x:   {code: "10301",   label: 수출}
+      m:   {code: "10401",   label: 수입}
+      sd:  {code: "10501",   label: 통계상 불일치}
+      gdp: {code: "10601",   label: GDP}
+  # 지출 항목별 브리지에 쓰는 월간 지표 (생산 측 지표 + 추가 2개)
+  exp_monthly:
+    eq:
+      label: 설비투자지수
+      stat: "901Y066"    # 8.1.3. 설비투자지수
+      items: [I15B]      # 계절조정지수
+    mv:
+      label: 수입물량
+      stat: "403Y004"    # 3.3.1.2.2. 수입물량지수
+      items: ["*AA"]
+      seasonal_adjust: true
+  exp_bridge:            # 지출 항목 ← 월간 지표
+    pc: sv               # 민간소비 ← 서비스업생산
+    gc: pa               # 정부소비 ← 공공행정
+    ci: cn               # 건설투자 ← 건설업생산
+    ei: eq               # 설비투자 ← 설비투자지수
+    x: ex                # 수출 ← 실질수출
+    m: mv                # 수입 ← 수입물량
+
 monthly_start: "200001"
 
 model:
