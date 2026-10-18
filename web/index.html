@@ -759,7 +759,7 @@ function renderExp() {
   const d = h("details"); d.appendChild(h("summary", "", "지출 항목 브리지 (항목 전기비 ← 월간 지표)"));
   const g = est.length ? est[est.length - 1].growth : {};
   d.appendChild(smallTable(["항목", "지표", "계수", "R²", est.length ? `${qlab(est[est.length - 1].q)} 추정` : ""],
-    Object.entries(E.bridge).map(([k, b]) => [E.comp_labels[k], E.ind_labels[b.ind] || b.ind, b.coef.toFixed(2), b.r2.toFixed(2), { v: g[k] != null ? fmt(g[k], 1) + "%" : "", est: true }])));
+    Object.entries(E.bridge).map(([k, b]) => [E.comp_labels[k], E.ind_labels[b.ind] || b.ind, b.coef == null ? "–" : b.coef.toFixed(2), b.r2.toFixed(2), { v: g[k] != null ? fmt(g[k], 1) + "%" : "", est: true }])));
   d.appendChild(h("p", "note", `기타(지식재산투자·재고증감·통계상 불일치) = 최근 8개 분기 평균 기여 ${fmt(E.other_mean)}%p로 고정 · 순수출 = 수출 − 수입 · 헤드라인은 생산 측 추정, 지출 측은 교차 점검용`));
   more.appendChild(d);
 }
@@ -804,7 +804,9 @@ function renderMethod() {
     ["실질수출", [
       "한은 수출물량지수(STL 계절조정 + 영업일 보정) → 반도체 단가 효과 제거",
       "물량지수 미발표 월: 관세청 10일·20일·월 속보 금액 증가율 ÷ 수출물가(달러) 증가율",
-      ...DATA.customs.map(c => `반영: ${c.month}(${({ d10: "10일", d20: "20일", m: "월" })[c.period] || c.period}) 금액 ${fmt(c.value_yoy, 1)}% − 단가 ${fmt(c.price_yoy, 1)}% → 물량 ${fmt(c.volume_yoy, 1)}%`)]],
+      "속보 반영 비중: 10일 50% · 20일 80% · 월 100%, 명절 이동(조업일수 2일 이상 차이) 시 절반 → 나머지는 직전 달 물량 증가율",
+      ...DATA.customs.map(c => `반영: ${c.month}(${({ d10: "10일", d20: "20일", m: "월" })[c.period] || c.period}) 금액 ${fmt(c.value_yoy, 1)}% − 단가 ${fmt(c.price_yoy, 1)}%${c.price_assumed ? "(직전 달)" : ""} → 속보 물량 ${fmt(c.flash_volume_yoy ?? c.volume_yoy, 1)}%` +
+        (c.weight != null && c.weight < 1 ? ` × ${c.weight} + 직전 달 ${fmt(c.prior_yoy, 1)}% × ${(1 - c.weight).toFixed(2)} = ${fmt(c.volume_yoy, 1)}%` : ""))]],
     ["계수 재추정", [
       "GDP 신규 발표·개정 시에만",
       "분기 중 추정치 변동 → 전부 지표 기여로 분해"]],
@@ -818,7 +820,8 @@ function renderMethod() {
       "한은 발표 분기만 표시(추정 없음)"]],
     DATA.expenditure && ["지출 측 교차 점검", [
       "기여도 = Δ실질 수준(계절조정) ÷ 전기 GDP",
-      "추정 분기: 항목별 브리지 — 민간소비←서비스업생산, 정부소비←공공행정, 건설투자←건설업생산, 설비투자←설비투자지수, 수출←실질수출, 수입←수입물량",
+      "추정 분기: 항목별 브리지 — 민간소비←서비스업생산, 건설투자←건설업생산, 설비투자←설비투자지수, 수출←실질수출, 수입←수입물량",
+      "지표 설명력(R²) 0.1 미만 항목(정부소비 등) → 최근 8분기 평균 증가율",
       "헤드라인은 생산 측 유지 → 두 방식 차이 = 추정 불확실성 신호"]],
     ["분기 연율(SAAR)", [
       "(1 + 전기비)⁴ − 1",
