@@ -4,3 +4,4 @@ statsmodels>=0.14
 holidays>=0.60
 pyyaml>=6
 requests>=2.31
+pypdf>=4
