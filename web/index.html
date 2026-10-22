@@ -238,7 +238,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 
   <section id="dist-sec" hidden>
     <h2>분배: 피용자보수 vs 영업잉여</h2>
-    <p class="sub">경상 GDP 전년동기비(%)의 소득 항목별 기여도(%p) = 전년 소득 비중 × 항목 증가율</p>
+    <p class="sub">경상 GDP 전년동기비(%)의 소득 항목별 기여도(%p) = 전년 소득 비중 × 항목 증가율 · 맨 끝 빗금 = 당해 연간 추정</p>
     <p class="lead" id="dist-lead"></p>
     <div class="legend"><span><i class="key s1"></i>피용자보수</span><span><i class="key s2"></i>총영업잉여</span><span><i class="key s3"></i>순생산·수입세</span><span><i class="key dot"></i>경상 GDP</span></div>
     <div class="chart" id="c-dist"></div>
@@ -686,12 +686,13 @@ function stackBars(box, rows, series, opts = {}) {
         fill: r.est ? `url(#${pid(sg.S.k)})` : css(sg.S.c), stroke: css("--bg"), "stroke-width": 1 }, g);
     });
     if (r[opts.total] != null) el("circle", { cx: x + bw / 2, cy: Y(r[opts.total]), r: 4.5, fill: css("--ink"), stroke: css("--bg"), "stroke-width": 2 }, g);
-    if (r.est) { el("rect", { x: m.l + band * i, y: m.t, width: band, height: H - m.t - m.b, fill: "none" }, g); txt(svg, x + bw / 2, m.t - 3, "추정", { "text-anchor": "middle", "font-size": 10.5 }); }
-    txt(svg, x + bw / 2, H - 7, qlab(r.q), { "text-anchor": "middle" });
+    if (r.est) txt(svg, x + bw / 2, m.t - 3, r.top || "추정", { "text-anchor": "middle", "font-size": 10.5 });
+    if (r.label && i) el("line", { x1: m.l + band * i, x2: m.l + band * i, y1: m.t, y2: H - m.b, stroke: css("--axis"), "stroke-dasharray": "3 3" }, svg);  // 분기 | 연간 구분
+    txt(svg, x + bw / 2, H - 7, r.label || qlab(r.q), { "text-anchor": "middle", ...(r.label ? { class: "lbl", "font-size": 11 } : {}) });
     el("rect", { x: m.l + band * i, y: 0, width: band, height: H, fill: "transparent" }, g);
     const show = () => {
       const k = box.clientWidth / W;
-      const ls = [{ v: `${r.q.replace("Q", "년 ")}분기${r.est ? " (추정)" : ""}` }, { v: fmt(r[opts.total]) + "%", k: opts.totalName, strong: true }];
+      const ls = [{ v: r.title || `${r.q.replace("Q", "년 ")}분기${r.est ? " (추정)" : ""}` }, { v: fmt(r[opts.total]) + "%", k: opts.totalName, strong: true }];
       series.slice().reverse().forEach(S => ls.push({ v: fmt(r[S.k]) + "%p", k: S.name, key: css(S.c) }));
       if (opts.extra) opts.extra(r).forEach(x => ls.push(x));
       tip.show(ls, (x + bw / 2) * k, m.t * k + 10);
@@ -767,7 +768,10 @@ function renderDist() {
   const lead = $("#dist-lead"); lead.replaceChildren();
   lead.appendChild(h("b", "", `${L.q.replace("Q", "년 ")}분기 경상 GDP ${fmt(L.gdp_n, 1)}%`));
   lead.appendChild(document.createTextNode(` → 영업잉여 ${fmt(L.c_surplus, 1)}%p · 피용자보수 ${fmt(L.c_comp, 1)}%p · 세금 ${fmt(L.c_tax, 1)}%p (증가율: 영업잉여 ${fmt(L.g_surplus, 1)}%, 피용자보수 ${fmt(L.g_comp, 1)}%)`));
-  stackBars($("#c-dist"), rows, S, { total: "gdp_n", totalName: "경상 GDP", aria: "경상 GDP 소득 항목별 기여도",
+  const DA = DATA.labor && DATA.labor.dist_annual;
+  const bars = DA ? [...rows.slice(-7), { ...DA, q: String(DA.year), est: true, label: "연간", top: `'${String(DA.year).slice(2)} 추정`,
+    title: `${DA.year}년 연간 추정 (${DA.n_actual}개 분기 실적 + 추정)` }] : rows;
+  stackBars($("#c-dist"), bars, S, { total: "gdp_n", totalName: "경상 GDP", aria: "경상 GDP 소득 항목별 기여도",
     extra: r => [{ v: `증가율 보수 ${fmt(r.g_comp, 1)}% · 잉여 ${fmt(r.g_surplus, 1)}% · 세금 ${fmt(r.g_tax, 1)}%`, cls: "k" }] });
   const more = $("#dist-more"); more.replaceChildren();
   const d = h("details"); d.appendChild(h("summary", "", "항목별 증가율·소득 비중"));

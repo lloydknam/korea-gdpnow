@@ -208,6 +208,12 @@ def labor_section(raw: dict, annual: dict | None) -> dict | None:
                   "prev": hist[-1]["ls"], "g_comp": _r(G["comp"], 1), "g_nos": _r(G["nos"], 1), "g_ni": _r(g_ni, 1),
                   "g_n": _r(G["n"], 1), "n_actual": int(len(act))}
     out["quarters"] = [{k: (_r(v, 1) if isinstance(v, float) else v) for k, v in r.items()} for r in rows]
+    # 분배 막대 끝에 붙일 당해 연간 기여도(전년 소득 비중 × 연간 증가율 ≈ 분기 평균)
+    gg = {k: float(np.mean([r[k] for r in rows])) for k in ("n", "comp", "gos", "tax")}
+    out["dist_annual"] = {"year": year, "gdp_n": _r(gg["n"], 1), "c_comp": _r(w["comp"] * gg["comp"]),
+                          "c_surplus": _r(w["gos"] * gg["gos"]), "c_tax": _r(w["tax"] * gg["tax"]),
+                          "g_comp": _r(gg["comp"], 1), "g_surplus": _r(gg["gos"], 1), "g_tax": _r(gg["tax"], 1),
+                          "n_actual": int(len(act))}
     return out
 
 
