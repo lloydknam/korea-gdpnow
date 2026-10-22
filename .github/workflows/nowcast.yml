@@ -17,6 +17,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  issues: write
 
 concurrency:
   group: nowcast
@@ -60,6 +61,13 @@ jobs:
           path: site
       - id: deploy
         uses: actions/deploy-pages@v4
+
+      # 발표일이 지났는데 안 들어온 자료 → GitHub 이슈로 알림(해소되면 자동 종료)
+      - name: Data alerts
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m nowcast.alert_issue
 
       - name: Commit state & history
         run: |

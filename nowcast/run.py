@@ -408,6 +408,27 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         except Exception as e:  # noqa: BLE001
             print(f"::warning::발표 일정 생략 — {type(e).__name__} {e}")
 
+    # 미수집 감시: 발표일이 지났는데 반영 안 된 자료 → 사이트 배너 + data/alerts.json(→ GitHub 이슈)
+    alerts = []
+    if rel_path.exists():
+        try:
+            flash = adjust.load_customs(ROOT / "data" / "customs_flash.csv")
+            ex_off = meta["ex"]["actual_last"]
+
+            def got_flash(min_rank):
+                ms = list(flash.loc[flash["rank"] >= min_rank, "ref"]) if not flash.empty else []
+                return max(ms + [ex_off])
+
+            have = {"customs_d10": got_flash(0), "customs_d20": got_flash(1), "customs_m": got_flash(2),
+                    "prices": raw["px"].index.max(), "cpi": raw["cpi"].index.max(), "esi": esi.index.max(),
+                    "activity": raw["ip"].index.max(), "gdp_adv": gdp.dropna().index.max()}
+            alerts = releases.overdue(yaml.safe_load(rel_path.read_text()), now, have)
+        except Exception as e:  # noqa: BLE001
+            print(f"::warning::미수집 감시 생략 — {type(e).__name__} {e}")
+    (data_dir / "alerts.json").write_text(json.dumps(alerts, ensure_ascii=False, indent=1))
+    for a in alerts:
+        print(f"::warning::미수집 — {a['name']} {a['ref']} ({a['date']} 발표{' 예상' if a['est'] else ''}, {a['days']}일 경과)")
+
     g = gdp.dropna()
     payload = {
         "generated_at": now.isoformat(timespec="minutes"),
@@ -429,6 +450,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         "esi": {"last": str(esi.index.max()), "value": r(esi.iloc[-1], 1)},
         "gni": ext["gni"], "dist": ext["dist"], "labor": ext["labor"], "expenditure": ext["exp"],
         "releases": upcoming,
+        "alerts": alerts,
     }
     (site_dir / "nowcast.json").write_text(json.dumps(payload, ensure_ascii=False))
     tpl = (ROOT / "web" / "index.html").read_text()

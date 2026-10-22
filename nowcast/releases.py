@@ -94,3 +94,42 @@ def upcoming(cfg: dict, now: datetime, rmse: dict | None = None, horizon: int = 
             out.append(item)
     out.sort(key=lambda x: (x["date"], x["time"] or ""))
     return out[:limit]
+
+
+# ------------------------------------------------------------------ 미수집 감시
+FIX = {
+    "customs": "data/customs_flash.csv에 한 줄 추가(휴대폰 GitHub에서 편집 → 저장하면 자동 재계산)",
+    "ecos": "ECOS 반영 지연 — 보통 하루 안에 자동 해소. 사흘 넘게 계속되면 통계코드 변경 여부 확인",
+    "gdp": "예상 발표일 기준 — 실제 일정이 다르면 config/releases.yaml의 fixed에 날짜 기입",
+}
+
+
+def overdue(cfg: dict, now: datetime, have: dict, grace_days: int = 2) -> list[dict]:
+    """지난 발표인데 데이터가 아직 없는 항목.
+    have: release key → 이미 반영된 가장 최근 대상 기간(pd.Period, 월 또는 분기). 키가 없으면 감시 안 함."""
+    today = now.date()
+    fixed = {k: [date.fromisoformat(str(x)) for x in v] for k, v in (cfg.get("fixed") or {}).items()}
+    out = []
+    for r in cfg["releases"]:
+        k = r["key"]
+        if k not in have:
+            continue
+        cur = pd.Period(today.strftime("%Y-%m"), "M")
+        for p in (cur, cur - 1):  # 가장 최근에 지난 발표 하나만
+            fx = [x for x in fixed.get(k, []) if x.year == p.year and x.month == p.month]
+            d = fx[0] if fx else rule_date(r["rule"], p.year, p.month)
+            if d is None or d > today:
+                continue
+            ref, rp = _ref_label(r.get("ref", "prev"), k, d)
+            grace = grace_days + (2 if k == "gdp_adv" and not fx else 0)
+            got = have[k]
+            if (today - d).days >= grace and (got is None or got < rp):
+                kind = "customs" if k.startswith("customs") else ("gdp" if k == "gdp_adv" else "ecos")
+                item = {"key": k, "name": r["name"], "org": r.get("org"), "ref": ref, "ref_period": str(rp),
+                        "date": d.isoformat(), "est": not fx, "days": (today - d).days, "fix": FIX[kind]}
+                if kind == "customs":
+                    per = {"customs_d10": "d10", "customs_d20": "d20", "customs_m": "m"}[k]
+                    item["template"] = f"{d.isoformat()},{rp},{per},<수출 전년동기비 %>,,,<수출액 백만달러>,<반도체 %>"
+                out.append(item)
+            break
+    return out

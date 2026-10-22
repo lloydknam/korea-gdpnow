@@ -373,6 +373,8 @@ function renderHead() {
     ` · 연간(전년비) 기준. 실질은 ${est.length ? (4 - est.length) + "개 분기 발표 + " + est.map(q => q + "분기").join("·") + " 실시간 추정" : "4개 분기 모두 발표"}, ` +
     `명목은 ${A.nominal_last.replace("Q", "년 ")}분기까지 발표.`));
   box.appendChild(m);
+  (DATA.alerts || []).forEach(a => box.appendChild(h("div", "warn",
+    `미반영: ${a.name} ${a.ref} (${+a.date.slice(5, 7)}/${+a.date.slice(8)} 발표${a.est ? " 예상" : ""}) → 이 자료 없이 추정 중, 들어오면 자동 반영`)));
   const nx = (DATA.releases || [])[0];
   if (nx) {
     const p = h("div", "h-meta"); p.appendChild(h("b", "", "다음 갱신 "));
