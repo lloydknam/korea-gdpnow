@@ -88,7 +88,9 @@ def make(seed=7):
     base = pd.Series(np.linspace(1_200_000, 2_600_000, len(ann)), index=ann)
     dist_ann = {"10106": base, "10101": base * 0.45, "10102": base * 0.25, "10103": base * 0.20,
                 "10104": base * 0.11, "10105": base * 0.01}
+    ls_ann = {"10301": base * 0.70, "10101": base * 0.47, "10201": base * 0.23}
     extras_out = {
+        **{("200Y116", k): v for k, v in ls_ann.items()},
         ("200Y102", "10211"): gdp_yoy[q11].round(1), ("200Y102", "20122"): (gdp_yoy + gap)[q11].round(1),
         ("200Y102", "60211"): nom_yoy[q11].round(1), ("200Y102", "60212"): comp_g[q11].round(1),
         ("200Y102", "60213"): sur_g[q11].round(1), ("200Y102", "60214"): tax_g[q11].round(1),

@@ -36,6 +36,10 @@ def collect(cfg: dict, fetcher, end_q: str, end_m: str) -> dict:
     dw = ex["dist_weights"]
     grab("dist_weights", lambda: raw.update({f"dw_{k}": fetcher(dw["stat"], "A", dw["start"], end_q[:4], [c])
                                              for k, c in dw["items"].items()}))
+    if "labor_share" in ex:
+        ls = ex["labor_share"]
+        grab("labor_share", lambda: raw.update({f"ls_{k}": fetcher(ls["stat"], "A", ls["start"], end_q[:4], [c])
+                                                for k, c in ls["items"].items()}))
     e = ex["expenditure"]
     grab("expenditure", lambda: raw.update({f"exp_{k}": fetcher(e["stat"], "Q", e["start"], end_q, [it["code"]])
                                             for k, it in e["items"].items()}))
@@ -129,6 +133,82 @@ def dist_section(raw: dict) -> dict | None:
              for y, w in W.tail(12).iterrows()]
     return {"rows": rows, "share": share, "last": str(Q.index.max()),
             "labels": {"comp": "피용자보수", "surplus": "총영업잉여", "tax": "순생산·수입세"}}
+
+
+# ------------------------------------------------------------------ ❺-2 노동소득분배율
+def labor_section(raw: dict, annual: dict | None) -> dict | None:
+    """노동소득분배율(피용자보수 ÷ 요소비용국민소득, 한은 공식·연간) 실적 + 당해 추정.
+
+    당해 추정 = 전년 분배율 × (1+피용자보수 증가율) ÷ (1+국민소득 증가율)
+      국민소득 = 피용자보수 + 기업·재산소득(≈ 순영업잉여)
+      분기 전년동기비: 발표 분기 = 한은 실적 / 미발표 분기 = 피용자보수·세금은 최근 2개 분기 평균,
+        총영업잉여는 경상 GDP 실시간 추정에서 역산 → 고정자본소모 제외해 순영업잉여로
+      연간 증가율 ≈ 4개 분기 전년동기비 평균
+    범위: 경상 성장률 ±1 RMSE를 미발표 분기에 얹어 다시 계산
+    """
+    need = ["ls_ni", "ls_comp", "inc_gdp_n", "inc_comp", "inc_surplus", "inc_tax",
+            "dw_gdp", "dw_comp", "dw_os", "dw_cfc", "dw_tax", "dw_sub"]
+    if any(raw.get(k) is None or raw[k].empty for k in need):
+        return None
+    ni, comp = raw["ls_ni"], raw["ls_comp"]
+    j = pd.concat([ni.rename("ni"), comp.rename("comp")], axis=1).dropna()
+    hist = [{"y": int(p.year), "ls": _r(v.comp / v.ni * 100, 1)} for p, v in j.iterrows()]
+    out = {"annual": hist[-16:], "last_year": hist[-1]["y"]}
+    if not annual:
+        return out
+    year = annual["year"]
+    base = year - 1
+    if hist[-1]["y"] != base:
+        return out  # 전년 확정 연간치가 아직 없음
+    A = pd.concat({k: raw[f"dw_{k}"] for k in ("gdp", "comp", "os", "cfc", "tax", "sub")}, axis=1).dropna()
+    A.index = [p.year for p in A.index]
+    if base not in A.index or (base - 1) not in A.index:
+        return out
+    a = A.loc[base]
+    gos, cfc, nos = a["os"] + a["cfc"], a["cfc"], a["os"]
+    w = {"comp": a["comp"] / a["gdp"], "gos": gos / a["gdp"], "tax": (a["tax"] - a["sub"]) / a["gdp"]}
+    g_cfc = (A.loc[base, "cfc"] / A.loc[base - 1, "cfc"] - 1) * 100
+    Q = pd.concat({k: raw[f"inc_{k}"] for k in ("gdp_n", "comp", "surplus", "tax")}, axis=1).dropna()
+    yoy_n = {r["q"]: r["nom"] for r in annual.get("yoy", []) if r.get("nom") is not None}
+    qs = pd.period_range(f"{year}Q1", f"{year}Q4", freq="Q")
+    act = Q[Q.index.isin(qs)]
+    recent = Q.tail(2).mean()
+
+    def build(shift: float):
+        rows = []
+        n_est = sum(q not in act.index for q in qs)
+        for q in qs:
+            if q in act.index:
+                v = act.loc[q]
+                rows.append({"q": str(q), "est": False, "n": float(v.gdp_n), "comp": float(v.comp),
+                             "gos": float(v.surplus), "tax": float(v.tax)})
+                continue
+            if str(q) not in yoy_n:
+                return None
+            n = yoy_n[str(q)] + (shift * 4 / n_est if n_est else 0)
+            c, t = float(recent.comp), float(recent.tax)
+            rows.append({"q": str(q), "est": True, "n": n, "comp": c, "tax": t,
+                         "gos": (n - w["comp"] * c - w["tax"] * t) / w["gos"]})
+        for r in rows:  # 순영업잉여 = 총영업잉여 − 고정자본소모(전년 증가율 유지)
+            r["nos"] = (gos * (1 + r["gos"] / 100) - cfc * (1 + g_cfc / 100)) / nos * 100 - 100
+        G = {k: float(np.mean([r[k] for r in rows])) for k in ("n", "comp", "nos")}
+        last = j.iloc[-1]
+        s_c = last.comp / last.ni
+        g_ni = s_c * G["comp"] + (1 - s_c) * G["nos"]
+        ls = s_c * (1 + G["comp"] / 100) / (1 + g_ni / 100) * 100
+        return rows, G, g_ni, ls
+
+    res = build(0.0)
+    if not res:
+        return out
+    rows, G, g_ni, ls = res
+    sd = annual.get("nom_sd") or 0.0
+    lo, hi = build(+sd), build(-sd)  # 경상 성장률이 높을수록 영업잉여↑ → 분배율↓
+    out["est"] = {"year": year, "ls": _r(ls, 1), "lo": _r(lo[3], 1) if lo else None, "hi": _r(hi[3], 1) if hi else None,
+                  "prev": hist[-1]["ls"], "g_comp": _r(G["comp"], 1), "g_nos": _r(G["nos"], 1), "g_ni": _r(g_ni, 1),
+                  "g_n": _r(G["n"], 1), "n_actual": int(len(act))}
+    out["quarters"] = [{k: (_r(v, 1) if isinstance(v, float) else v) for k, v in r.items()} for r in rows]
+    return out
 
 
 # ------------------------------------------------------------------ ❻ 지출 측

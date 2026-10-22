@@ -243,6 +243,13 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
     <div class="legend"><span><i class="key s1"></i>피용자보수</span><span><i class="key s2"></i>총영업잉여</span><span><i class="key s3"></i>순생산·수입세</span><span><i class="key dot"></i>경상 GDP</span></div>
     <div class="chart" id="c-dist"></div>
     <div id="dist-more"></div>
+    <div id="ls-box" hidden>
+      <h3>노동소득분배율 (피용자보수 비율)</h3>
+      <p class="sub">피용자보수 ÷ 요소비용국민소득(한은 공식, 연간, %) · 빈 점 = 실시간 추정, 세로선 = 범위</p>
+      <p class="lead" id="ls-lead"></p>
+      <div class="chart" id="c-ls"></div>
+      <div id="ls-more"></div>
+    </div>
   </section>
 
   <section id="exp-sec" hidden>
@@ -770,6 +777,59 @@ function renderDist() {
   more.appendChild(d);
 }
 
+
+// ================================================================ ❺-2 노동소득분배율
+function renderLabor() {
+  const L = DATA.labor, wrap = $("#ls-box");
+  wrap.hidden = !L || !L.annual || L.annual.length < 3; if (wrap.hidden) return;
+  const E = L.est, pts = L.annual.map(a => ({ y: a.y, v: a.ls, est: false }));
+  if (E) pts.push({ y: E.year, v: E.ls, est: true, lo: E.lo, hi: E.hi });
+  const lead = $("#ls-lead"); lead.replaceChildren();
+  if (E) {
+    lead.appendChild(h("b", "", `${E.year}년 ≈ ${E.ls.toFixed(1)}% (${E.year - 1}년 ${E.prev.toFixed(1)}%, ${fmt(E.ls - E.prev, 1)}%p)`));
+    lead.appendChild(document.createTextNode(` · 피용자보수 ${fmt(E.g_comp, 1)}% vs 국민소득 ${fmt(E.g_ni, 1)}% (순영업잉여 ${fmt(E.g_nos, 1)}%) · 범위 ${E.lo?.toFixed(1)} ~ ${E.hi?.toFixed(1)}%`));
+  } else lead.appendChild(document.createTextNode(`${pts[pts.length - 1].y}년 ${pts[pts.length - 1].v.toFixed(1)}% (한은 실적)`));
+  const box = $("#c-ls"); box.replaceChildren();
+  const n = pts.length, W = box.clientWidth || 340, H = 190, m = { t: 14, r: 40, b: 22, l: 30 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "노동소득분배율" }, box);
+  const vals = pts.flatMap(p => [p.v, p.lo ?? p.v, p.hi ?? p.v]);
+  const ticks = niceTicks(Math.min(...vals) - 0.5, Math.max(...vals) + 0.5, 4);
+  const X = i => m.l + (W - m.l - m.r) * i / (n - 1);
+  const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks[ticks.length - 1] - ticks[0]));
+  grid(svg, ticks, Y, m.l, W - m.r);
+  const nA = pts.filter(p => !p.est).length;
+  el("path", { d: pts.slice(0, nA).map((p, i) => `${i ? "L" : "M"}${X(i)},${Y(p.v)}`).join(""), fill: "none", stroke: css("--main"), "stroke-width": 2.5, "stroke-linejoin": "round" }, svg);
+  if (E) {
+    const i = n - 1;
+    el("path", { d: `M${X(i - 1)},${Y(pts[i - 1].v)}L${X(i)},${Y(E.ls)}`, fill: "none", stroke: css("--main"), "stroke-width": 2, "stroke-dasharray": "5 4" }, svg);
+    if (E.lo != null && E.hi != null) el("line", { x1: X(i), x2: X(i), y1: Y(E.lo), y2: Y(E.hi), stroke: css("--main"), "stroke-width": 2, opacity: .55 }, svg);
+    el("circle", { cx: X(i), cy: Y(E.ls), r: 5, fill: css("--bg"), stroke: css("--main"), "stroke-width": 2.5 }, svg);
+    txt(svg, X(i) + 8, Y(E.ls) + 4, E.ls.toFixed(1), { class: "lbl" });
+  }
+  const la = pts[nA - 1];
+  el("circle", { cx: X(nA - 1), cy: Y(la.v), r: 4, fill: css("--main"), stroke: css("--bg"), "stroke-width": 2 }, svg);
+  txt(svg, X(nA - 1), Y(la.v) - 9, la.v.toFixed(1), { class: "lbl", "text-anchor": "middle" });
+  pts.forEach((p, i) => { if ((p.y % 5 === 0 && i < n - 2) || i === n - 1) txt(svg, X(i), H - 6, `'${String(p.y).slice(2)}`, { "text-anchor": "middle" }); });
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), opacity: 0 }, svg), tip = tipFor(box);
+  const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", e => {
+    const { sx, k } = svgPt(svg, W, e);
+    const i = Math.max(0, Math.min(n - 1, Math.round((sx - m.l) / (W - m.l - m.r) * (n - 1)))), p = pts[i];
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", 1);
+    const ls = [{ v: `${p.y}년${p.est ? " (추정)" : ""}` }, { v: p.v.toFixed(1) + "%", k: "노동소득분배율", strong: true }];
+    if (p.est && p.lo != null) ls.push({ v: `범위 ${p.lo.toFixed(1)} ~ ${p.hi.toFixed(1)}%`, cls: "k" });
+    tip.show(ls, X(i) * k, Y(p.v) * k);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
+  const more = $("#ls-more"); more.replaceChildren();
+  if (E && L.quarters) {
+    const d = h("details"); d.appendChild(h("summary", "", `${E.year}년 분기별 전년동기비 (%)`));
+    d.appendChild(smallTable(["분기", "경상 GDP", "피용자보수", "순영업잉여"],
+      L.quarters.map(r => [qlab(r.q) + (r.est ? "*" : ""), { v: fmt(r.n, 1), est: r.est }, { v: fmt(r.comp, 1), est: r.est }, { v: fmt(r.nos, 1), est: r.est }])));
+    d.appendChild(h("p", "note", `* 추정: 피용자보수 = 최근 2개 분기 평균 증가율 / 총영업잉여 = 경상 GDP 실시간 추정에서 역산 → 고정자본소모(전년 증가율 유지) 빼 순영업잉여 / 연간 = 분기 평균 → 근사치. 범위 = 경상 성장률 ±1 RMSE. ${E.n_actual}개 분기 실적 반영`));
+    more.appendChild(d);
+  }
+}
 // ================================================================ ❻ 지출 측
 function renderExp() {
   const E = DATA.expenditure, sec = $("#exp-sec");
@@ -877,7 +937,8 @@ function renderMethod() {
     DATA.dist && ["분배 (소득 측)", [
       "경상 GDP = 피용자보수 + 총영업잉여 + 순생산·수입세",
       "기여도 = 전년 소득 비중(한은 연간 국민계정) × 항목 전년동기비",
-      "한은 발표 분기만 표시(추정 없음)"]],
+      "한은 발표 분기만 표시(추정 없음)",
+      "노동소득분배율 = 피용자보수 ÷ 요소비용국민소득(한은 공식). 당해 추정 = 전년 분배율 × (1+피용자보수 증가율) ÷ (1+국민소득 증가율), 영업잉여는 경상 GDP 실시간 추정에서 역산"]],
     DATA.expenditure && ["지출 측 교차 점검", [
       "기여도 = Δ실질 수준(계절조정) ÷ 전기 GDP",
       "추정 분기: 항목별 브리지 — 민간소비←서비스업생산, 건설투자←건설업생산, 설비투자←설비투자지수",
@@ -976,7 +1037,7 @@ function renderEvo() {
   if (pts.length < 3) box.appendChild(h("p", "note", "갱신 이력 짧음. 지표 발표마다 한 칸씩 누적"));
 }
 
-function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderGNI(); renderDist(); renderExp(); renderCal(); renderBT(); renderMethod(); }
+function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderGNI(); renderDist(); renderLabor(); renderExp(); renderCal(); renderBT(); renderMethod(); }
 if (DATA) {
   $("#badge").textContent = kst(DATA.generated_at, { year: "numeric", month: "long", day: "numeric" }) + " 업데이트";
   $("#lede").textContent = `${DATA.annual ? DATA.annual.year : new Date().getFullYear()}년 경제성장률 실시간 추정(비공식)`;

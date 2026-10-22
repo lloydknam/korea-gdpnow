@@ -384,13 +384,14 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
                           "val": r(((1 + vy) * (1 + py) - 1) * 100, 1)})
 
     # 6) 부가 분석 ❹ 실질 GNI ❺ 분배 ❻ 지출 측 — 실패해도 본 추정은 그대로
-    ext = {"gni": None, "dist": None, "exp": None, "errors": []}
+    ext = {"gni": None, "dist": None, "labor": None, "exp": None, "errors": []}
     if "extras" in cfg:
         xr = extras.collect(cfg, fetcher, f"{now.year}Q4", f"{now.year}{now.month:02d}")
         ext["errors"] = xr.pop("_errors", [])
         prod = {q: v for q, (v, _, _) in real_nc.items()}
         for name, fn in [("gni", lambda: extras.gni_section(xr, raw["px"], raw["pm"], annual)),
                          ("dist", lambda: extras.dist_section(xr)),
+                         ("labor", lambda: extras.labor_section(xr, annual)),
                          ("exp", lambda: extras.exp_section(cfg, xr, levels, esi, list(real_nc), prod))]:
             try:
                 ext[name] = fn()
@@ -426,7 +427,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         "customs": customs_used,
         "chips": chips,
         "esi": {"last": str(esi.index.max()), "value": r(esi.iloc[-1], 1)},
-        "gni": ext["gni"], "dist": ext["dist"], "expenditure": ext["exp"],
+        "gni": ext["gni"], "dist": ext["dist"], "labor": ext["labor"], "expenditure": ext["exp"],
         "releases": upcoming,
     }
     (site_dir / "nowcast.json").write_text(json.dumps(payload, ensure_ascii=False))
@@ -443,6 +444,9 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
     if ext["gni"] and ext["gni"].get("annual"):
         a = ext["gni"]["annual"]
         print(f"{a['year']}년 실질 GNI ≈ {a['gni']:+.1f}% (실질 GDP {a['gdp']:+.1f}%, 차이 {a['gap']:+.1f}%p)")
+    if ext["labor"] and ext["labor"].get("est"):
+        e = ext["labor"]["est"]
+        print(f"{e['year']}년 노동소득분배율 ≈ {e['ls']:.1f}% ({e['year'] - 1}년 {e['prev']:.1f}%)")
     if ext["exp"]:
         for row in ext["exp"]["rows"]:
             if row["est"]:

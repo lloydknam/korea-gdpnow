@@ -55,6 +55,10 @@ def test_pipeline(tmp_root=None):
     assert e and [r["q"] for r in e["rows"] if r["est"]] == ["2026Q3", "2026Q4"]
     for row in e["rows"]:  # 항목 기여도 합 = GDP 증가율
         assert abs(sum(row[k] for k in e["order"]) - row["gdp"]) < 0.02, row
+    lb = p2["labor"]
+    assert lb and lb["est"] and lb["est"]["lo"] < lb["est"]["ls"] < lb["est"]["hi"], lb and lb.get("est")
+    rel = p2["releases"]
+    assert rel and rel[0]["date"] > "2026-10-30" and any(x["key"] == "activity" for x in rel), rel
     html = (tmp / "site" / "index.html").read_text()
     assert "/*__DATA__*/" not in html
     return tmp, p1, p2
