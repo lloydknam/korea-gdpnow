@@ -14,7 +14,7 @@ LIST = """
   <span class="text"><strong>2026년 9월 수출입 운송비용 현황</strong></span><span class="source"><span>2026-10-15</span><span>관세청</span></span></a></li>
 <li><a href="https://www.korea.kr/briefing/pressReleaseView.do?newsId=156785248&pageIndex=1">
   <strong>2026년 9월 월간 수출입 현황 [확정치]</strong><span>2026-10-15</span><span>관세청</span></a></li>
-<li><a href="https://www.korea.kr/briefing/pressReleaseView.do?newsId=156784799&pageIndex=1">
+<li><a href="https://www.korea.kr/briefing/pressReleaseView.do?newsId=156784799&pageIndex=1&startDate=2026-08-01&endDate=2026-10-18">
   <strong>2026년 10월 1일 ~ 10월 10일 수출입 현황 [잠정치]</strong><span>2026-10-12</span><span>관세청</span></a></li>
 <li><a href="https://www.korea.kr/briefing/pressReleaseView.do?newsId=156783912&pageIndex=1">
   <strong>2026년 9월 수출입 동향</strong><span>2026-10-01</span><span>산업통상부</span></a></li>
@@ -76,6 +76,20 @@ class RelaySession(FakeSession):
         return Resp(text=r.text + " " * 300, content=r.content)
 
 
+class SearchDownSession(FakeSession):
+    """검색(srchWord)이 404인 날: 최신 목록 훑기로 찾아야 함."""
+    def get(self, url, params=None, **kw):
+        import requests
+        if url == cs.LIST_URL and params and params.get("srchWord"):
+            r = requests.Response(); r.status_code = 404
+            raise requests.HTTPError("404", response=r)
+        if url == cs.LIST_URL:
+            if params["pageIndex"] == 1:
+                return Resp(LIST.replace("2026-09-21", "2099-01-01"))  # 최근 날짜로 보이게
+            return Resp("<li>2000-01-01</li>")
+        return super().get(url, params=params, **kw)
+
+
 def test():
     cs.pdf_text = lambda data, max_pages=3: PDF_TEXT.get(data.split(b":")[1].decode(), "")
 
@@ -98,7 +112,9 @@ def test():
         ("2026-10", "d10", "2026-10-12"), ("2026-09", "m", "2026-10-01"), ("2026-09", "d20", "2026-09-21")], items
 
     tmp = Path(tempfile.mkdtemp()) / "customs_flash.csv"
-    shutil.copy(cs.CSV, tmp)
+    # 실제 data/ 파일은 계속 늘어나므로 9월분만 있는 고정 내용으로 시험
+    tmp.write_text("# 주석\nrelease_date,ref_month,period,exports_yoy_pct,workdays,workdays_prev,exports_usd_mn,chip_yoy_pct\n"
+                   "2026-09-21,2026-09,d20,78.3,15.5,16.5,71400,259.4\n2026-10-01,2026-09,m,83.5,,,120940,263.0\n", encoding="utf-8")
     before = tmp.read_text(encoding="utf-8")
     cs._route["mode"] = "direct"
     new = cs.scrape(path=tmp, sess=FakeSession())
@@ -126,6 +142,13 @@ def test():
     new = cs.scrape(path=tmp, sess=RelaySession())
     got = {(r["ref_month"], r["period"]): (r["exports_yoy_pct"], r.get("chip_yoy_pct")) for r in new}
     assert got == {("2026-10", "d10"): (102.0, 170.9), ("2026-09", "m"): (83.5, 263.0)}, got
+
+    # 정책브리핑 검색 장애 → 최신 목록 훑기
+    cs._route["mode"] = "direct"
+    tmp.write_text("release_date,ref_month,period,exports_yoy_pct,workdays,workdays_prev,exports_usd_mn,chip_yoy_pct\n")
+    new = cs.scrape(path=tmp, sess=SearchDownSession())
+    assert {(r["ref_month"], r["period"]) for r in new} == {("2026-10", "d10"), ("2026-09", "m")}, new
+    assert [r["date"] for r in new if r["period"] == "d10"] == ["2026-10-12"], new  # href의 startDate 아님
     print("customs_scrape OK")
 
 

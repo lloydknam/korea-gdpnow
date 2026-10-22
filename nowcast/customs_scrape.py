@@ -33,6 +33,7 @@ UA = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Appl
                     "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
       "Accept-Language": "ko-KR,ko;q=0.9"}
 TIMEOUT = 25
+SCAN_PAGES, SCAN_DAYS = 40, 3   # 검색이 안 될 때: 최신 목록 최대 40쪽, 최근 3일치까지
 
 # ── 제목 → (연, 월, 기간) ─────────────────────────────────────────────
 # "2026년 10월 1일 ~ 10월 10일 수출입 현황 [잠정치]" / "2026년 9월 수출입 현황 [잠정치]"
@@ -124,7 +125,9 @@ def parse_list(page: str):
             continue
         # 이 링크 ~ 다음 링크 사이 텍스트에 제목·날짜가 있음
         end = hits[i + 1].start() if i + 1 < len(hits) else min(len(page), m.end() + 3000)
-        chunk = _text(page[m.end():end])
+        raw = page[m.end():end]
+        raw = raw[raw.find(">") + 1:] if ">" in raw else raw  # href 나머지(startDate= 등) 제거
+        chunk = _text(raw)
         cls = classify(chunk)
         if not cls:
             continue
@@ -238,14 +241,28 @@ def scrape(days: int = 60, path: Path = CSV, dry_run: bool = False, sess=None) -
     end = date.today() + timedelta(days=1)
     start = end - timedelta(days=days)
     items = []
-    for page_no in (1, 2):
-        params = {"srchWord": "수출입 현황", "startDate": start.isoformat(), "endDate": end.isoformat(),
-                  "pageIndex": page_no, "repCodeType": "", "repCode": "", "period": ""}
-        page = _get(sess, LIST_URL, params=params).text
-        got = parse_list(page)
-        items += [g for g in got if g["news_id"] not in {i["news_id"] for i in items}]
-        if "pageIndex=" + str(page_no + 1) not in page:
-            break
+
+    def add(got):
+        items.extend(g for g in got if g["news_id"] not in {i["news_id"] for i in items})
+
+    try:
+        for page_no in (1, 2):
+            params = {"srchWord": "수출입 현황", "startDate": start.isoformat(), "endDate": end.isoformat(),
+                      "pageIndex": page_no, "repCodeType": "", "repCode": "", "period": ""}
+            page = _get(sess, LIST_URL, params=params).text
+            add(parse_list(page))
+            if "pageIndex=" + str(page_no + 1) not in page:
+                break
+    except requests.HTTPError as e:
+        # 정책브리핑 검색이 멈춘 날(404·500)이 있음 → 검색 없이 최신 목록을 앞에서부터 훑음
+        print(f"  · 검색 실패({e.response.status_code if e.response is not None else '?'}) → 최신 목록 {SCAN_PAGES}쪽까지 훑기")
+        stop = (date.today() - timedelta(days=SCAN_DAYS)).isoformat()
+        for page_no in range(1, SCAN_PAGES + 1):
+            page = _get(sess, LIST_URL, params={"pageIndex": page_no}).text
+            add(parse_list(page))
+            ds = [f"{a}-{b}-{c}" for a, b, c in re.findall(r"(20\d{2})[-.](\d{2})[-.](\d{2})", _text(page))]
+            if ds and max(ds) < stop:
+                break
     have = existing_keys(path)
     new = []
     for it in sorted(items, key=lambda x: (x["ref_month"], x["period"])):
