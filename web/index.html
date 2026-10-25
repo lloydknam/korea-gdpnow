@@ -82,6 +82,7 @@ h2{font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin:0
 .key.sq{background:var(--main)}
 .key.band{background:var(--band)}
 .key.band2{background:var(--band2)}
+.key.hatch{background:repeating-linear-gradient(45deg,var(--main) 0 1.8px,color-mix(in srgb,var(--main) 28%,var(--bg)) 1.8px 3.6px)}
 .key.dmain{height:0;border-top:2.5px dashed var(--main);margin-top:6px}
 .key.line{height:0;border-top:2.5px solid var(--cmp2);margin-top:6px}
 .key.dash{height:0;border-top:2.5px dashed var(--cmp1);margin-top:6px}
@@ -222,7 +223,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
   <section>
     <h2>월별 지표</h2>
     <p class="sub">전월비(%, 계절조정) · 지표마다 세로 눈금이 다름</p>
-    <div class="legend"><span><i class="key sq"></i>실적</span><span><i class="key" style="background:var(--cmp1)"></i>관세청 속보 반영</span><span><i class="key band"></i>미발표 — 모형 추정</span></div>
+    <div class="legend"><span><i class="key sq"></i>실적</span><span><i class="key" style="background:var(--cmp1)"></i>관세청 속보 반영</span><span><i class="key hatch"></i>미발표 — 모형 추정</span></div>
     <div class="mini" id="mini"></div>
   </section>
 
@@ -627,13 +628,17 @@ function renderMini() {
     wrap.appendChild(head); const cb = h("div", "chart"); wrap.appendChild(cb); box.appendChild(wrap);
     const W = cb.clientWidth || 340, H = 80, m = { t: 6, b: 16 };
     const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": d.label + " 전월비" }, cb);
+    // 미발표 달 = 모형 추정 → 사이트 공통 표기(같은 색 사선 빗금)
+    const pid = `mini-h-${d.key}`, pt = el("pattern", { id: pid, width: 5, height: 5, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, el("defs", {}, svg));
+    el("rect", { width: 5, height: 5, fill: css("--main"), opacity: .28 }, pt);
+    el("line", { x1: 0, y1: 0, x2: 0, y2: 5, stroke: css("--main"), "stroke-width": 2.6 }, pt);
     const Y = v => m.t + (H - m.t - m.b) * (1 - (v + ext) / (2 * ext));
     const n = d.months.length, band = W / n, bw = Math.min(14, band - 3), tip = tipFor(cb);
     d.months.forEach((p, i) => { if (+p.m.slice(5) % 3 === 1 && i) el("line", { x1: band * i, x2: band * i, y1: m.t, y2: H - m.b, stroke: css("--grid") }, svg); });
     el("line", { x1: 0, x2: W, y1: Y(0), y2: Y(0), stroke: css("--axis") }, svg);
     d.months.forEach((p, i) => {
       const x = band * i + (band - bw) / 2, g = el("g", { tabindex: 0 }, svg);
-      el("path", { d: barPath(x, bw, Y(0), Y(p.mom), 2), fill: p.filled ? css("--band") : (p.flash ? css("--cmp1") : css("--main")) }, g);
+      el("path", { d: barPath(x, bw, Y(0), Y(p.mom), 2), fill: p.filled ? `url(#${pid})` : (p.flash ? css("--cmp1") : css("--main")) }, g);
       const mm = +p.m.slice(5);
       if (mm % 3 === 1) txt(svg, x + bw / 2, H - 3, mm === 1 ? `'${p.m.slice(2, 4)}.1` : mm + "월", { "text-anchor": "middle" });
       el("rect", { x: band * i, y: 0, width: band, height: H, fill: "transparent" }, g);
