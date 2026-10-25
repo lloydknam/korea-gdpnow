@@ -454,6 +454,9 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         "alerts": alerts,
     }
     (site_dir / "nowcast.json").write_text(json.dumps(payload, ensure_ascii=False))
+    for f in (ROOT / "web").iterdir():  # 아이콘 등 정적 파일
+        if f.is_file() and f.name != "index.html":
+            (site_dir / f.name).write_bytes(f.read_bytes())
     tpl = (ROOT / "web" / "index.html").read_text()
     data = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     (site_dir / "index.html").write_text(tpl.replace("/*__DATA__*/null", data))

@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Korea GDP Now</title>
 <meta name="description" content="Korea GDP Now — 경제성장률 실시간 추정(비공식), 월간 지표 발표 때마다 갱신">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta property="og:image" content="https://lloydknam.github.io/korea-gdpnow/icon-512.png">
 <meta name="theme-color" content="#f4f1eb" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#16191c" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
@@ -46,6 +50,8 @@ body{font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFo
 main{max-width:640px;margin:0 auto}
 .badge{display:inline-block;background:var(--badge);color:#fff;font-weight:800;font-size:15px;letter-spacing:.02em;padding:5px 14px;margin:0 0 10px}
 h1{font-size:32px;font-weight:800;letter-spacing:-.035em;line-height:1.1;margin:0}
+h1{display:flex;align-items:center;gap:10px}
+h1 .logo{width:34px;height:34px;flex:none}
 h1 i{font-family:Georgia,"Times New Roman","Nanum Myeongjo",serif;font-style:italic;font-weight:700;letter-spacing:-.01em}
 .lede{font-size:18px;color:var(--ink);margin:4px 0 18px}
 section{border-top:1px solid var(--rule);padding:18px 0 20px}
@@ -136,7 +142,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 .inst{font-family:Georgia,"Times New Roman","Nanum Myeongjo",serif;font-size:30px;font-weight:700;letter-spacing:.14em;line-height:1.2;color:var(--ink);text-transform:uppercase}
 .inst i{font-style:italic;letter-spacing:.05em;text-transform:none}
 .credit{font-size:11.5px;color:var(--ink-3);margin-top:6px}
-.contact{font-size:12px;margin-top:3px}
+.contact{font-size:12px;margin-top:3px;color:var(--ink-2)}
 .contact a{color:var(--ink-2);text-decoration:none;border-bottom:1px solid var(--rule)}
 .hits{display:inline-block;margin-top:12px;line-height:0}
 .hits img{height:20px;width:auto}
@@ -168,7 +174,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 <body>
 <main>
   <div class="badge" id="badge"></div>
-  <h1>Korea GDP <i>Now</i></h1>
+  <h1><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><defs><pattern id="logo-h" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#a9d3ea"/><line x1="0" y1="0" x2="0" y2="5" stroke="#135f8c" stroke-width="2.4"/></pattern></defs><rect width="64" height="64" rx="14" fill="#fff"/><rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="#135f8c" stroke-width="2"/><rect x="12" y="34" width="10" height="18" rx="2" fill="#135f8c"/><rect x="27" y="25" width="10" height="27" rx="2" fill="#135f8c"/><rect x="42" y="14" width="10" height="38" rx="2" fill="url(#logo-h)"/></svg>Korea GDP <i>Now</i></h1>
   <p class="lede" id="lede"></p>
 
   <section id="head"></section>
