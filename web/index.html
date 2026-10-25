@@ -236,6 +236,15 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
     <div id="gni-more"></div>
   </section>
 
+  <section id="bop-sec" hidden>
+    <h2>경상수지: 주요국 비교</h2>
+    <p class="sub">분기 경상수지(억달러, IMF 자료·한은 ECOS 수록) · 반도체 횡재의 대외 쪽 얼굴</p>
+    <p class="lead" id="bop-lead"></p>
+    <div class="legend"><span><i class="key line" style="border-color:var(--main)"></i>한국</span><span><i class="key line" style="border-color:var(--cmp1)"></i>중국</span><span><i class="key dash" style="border-color:var(--s2)"></i>독일+일본 합계</span></div>
+    <div class="chart" id="c-bop"></div>
+    <div id="bop-more"></div>
+  </section>
+
   <section id="dist-sec" hidden>
     <h2>분배: 피용자보수 vs 영업잉여</h2>
     <p class="sub">경상 GDP 전년동기비(%)의 소득 항목별 기여도(%p) = 전년 소득 비중 × 항목 증가율 · 맨 끝 빗금 = 당해 연간 추정</p>
@@ -759,6 +768,54 @@ function renderGNI() {
   more.appendChild(d);
 }
 
+
+// ================================================================ 경상수지 주요국 비교
+function renderBop() {
+  const B = DATA.bop, sec = $("#bop-sec");
+  const Q = (B && B.quarters || []).filter(r => r.KR != null && r.CN != null && r.DE != null && r.JP != null);
+  sec.hidden = Q.length < 3; if (sec.hidden) return;
+  const rows = Q.map(r => ({ ...r, DJ: r.DE + r.JP })), n = rows.length, L = rows[n - 1];
+  const fmtE = v => Math.round(v).toLocaleString("ko-KR");
+  const lead = $("#bop-lead"); lead.replaceChildren();
+  lead.appendChild(h("b", "", `${L.q.replace("Q", "년 ")}분기 한국 ${fmtE(L.KR)}억달러`));
+  lead.appendChild(document.createTextNode(` · 독일+일본 ${fmtE(L.DJ)}억달러${L.KR > L.DJ ? " 추월" : ""} · 중국(${fmtE(L.CN)}억)의 ${Math.round(L.KR / L.CN * 100)}%`));
+  if (B.kr_ytd) {
+    const y = B.kr_ytd, p = h("div", "note");
+    p.textContent = `한국 ${y.year}년 1~${y.through}월 누적 ${fmtE(y.v)}억달러` + (y.prev ? ` (전년 같은 기간 ${fmtE(y.prev)}억, ${(y.v / y.prev).toFixed(1)}배)` : "");
+    lead.appendChild(p);
+  }
+  const box = $("#c-bop"); box.replaceChildren();
+  const W = box.clientWidth || 340, H = 210, m = { t: 12, r: 44, b: 22, l: 40 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "주요국 경상수지" }, box);
+  const vals = rows.flatMap(r => [r.KR, r.CN, r.DJ]);
+  const ticks = niceTicks(Math.min(0, ...vals), Math.max(...vals), 4);
+  const X = i => m.l + (W - m.l - m.r) * i / (n - 1);
+  const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks[ticks.length - 1] - ticks[0]));
+  grid(svg, ticks, Y, m.l, W - m.r);
+  const S = [["CN", css("--cmp1"), 2, null], ["DJ", css("--s2"), 2, "6 4"], ["KR", css("--main"), 3, null]];
+  S.forEach(([k, c, w, dash]) => el("path", { d: rows.map((r, i) => `${i ? "L" : "M"}${X(i)},${Y(r[k])}`).join(""), fill: "none", stroke: c, "stroke-width": w, "stroke-linejoin": "round", ...(dash ? { "stroke-dasharray": dash } : {}) }, svg));
+  const ys = S.map(([k]) => Y(L[k]));
+  S.forEach(([k, c], j) => { el("circle", { cx: X(n - 1), cy: ys[j], r: 4, fill: c, stroke: css("--bg"), "stroke-width": 2 }, svg); });
+  // 한국은 항상 표시, 나머지는 한국 라벨과 겹치지 않을 때만
+  S.forEach(([k], j) => { if (k === "KR" || Math.abs(ys[j] - ys[2]) > 13) txt(svg, X(n - 1) + 7, ys[j] + 4, fmtE(L[k]), { class: "lbl" }); });
+  rows.forEach((r, i) => { if (r.q.endsWith("Q1")) txt(svg, X(i), H - 6, `'${r.q.slice(2, 4)}`, { "text-anchor": "middle" }); });
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), opacity: 0 }, svg), tip = tipFor(box);
+  const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", e => {
+    const { sx, k } = svgPt(svg, W, e);
+    const i = Math.max(0, Math.min(n - 1, Math.round((sx - m.l) / (W - m.l - m.r) * (n - 1)))), r = rows[i];
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", 1);
+    tip.show([{ v: r.q.replace("Q", "년 ") + "분기" }, { v: fmtE(r.KR), k: "한국", key: css("--main"), strong: true }, { v: fmtE(r.CN), k: "중국", key: css("--cmp1") },
+      { v: fmtE(r.DJ), k: `독일+일본 (${fmtE(r.DE)}+${fmtE(r.JP)})`, key: css("--s2"), dash: true }, { v: "억달러", cls: "k" }], X(i) * k, (m.t + 30) * k);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
+  const more = $("#bop-more"); more.replaceChildren();
+  const d = h("details"); d.appendChild(h("summary", "", "분기별 수치 (억달러)"));
+  d.appendChild(smallTable(["분기", "한국", "중국", "독일", "일본"], rows.slice(-6).reverse().map(r => [qlab(r.q), fmtE(r.KR), fmtE(r.CN), fmtE(r.DE), fmtE(r.JP)])));
+  if (B.kr_monthly) d.appendChild(h("p", "note", "한국 월별(억달러): " + B.kr_monthly.slice(-6).map(x => `${+x.m.slice(5)}월 ${fmtE(x.v)}`).join(" · ")));
+  d.appendChild(h("p", "note", `출처: ${Object.values(B.source || {}).join(" / ")} · 경상수지 ≈ 상품·서비스 순수출 + 해외 투자소득. 수출 '액' 급등이 그대로 흑자로 잡힘`));
+  more.appendChild(d);
+}
 // ================================================================ ❺ 분배
 function renderDist() {
   const D = DATA.dist, sec = $("#dist-sec");
@@ -1043,7 +1100,7 @@ function renderEvo() {
   if (pts.length < 3) box.appendChild(h("p", "note", "갱신 이력 짧음. 지표 발표마다 한 칸씩 누적"));
 }
 
-function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderGNI(); renderDist(); renderLabor(); renderExp(); renderCal(); renderBT(); renderMethod(); }
+function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderGNI(); renderBop(); renderDist(); renderLabor(); renderExp(); renderCal(); renderBT(); renderMethod(); }
 if (DATA) {
   $("#badge").textContent = kst(DATA.generated_at, { year: "numeric", month: "long", day: "numeric" }) + " 업데이트";
   $("#lede").textContent = `${DATA.annual ? DATA.annual.year : new Date().getFullYear()}년 경제성장률 실시간 추정(비공식)`;

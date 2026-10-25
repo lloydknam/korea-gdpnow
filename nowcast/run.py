@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from . import adjust, ecos, extras, model, releases
+from . import adjust, bop, ecos, extras, model, releases
 
 ROOT = Path(__file__).resolve().parent.parent
 KST = timezone(timedelta(hours=9))
@@ -384,7 +384,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
                           "val": r(((1 + vy) * (1 + py) - 1) * 100, 1)})
 
     # 6) 부가 분석 ❹ 실질 GNI ❺ 분배 ❻ 지출 측 — 실패해도 본 추정은 그대로
-    ext = {"gni": None, "dist": None, "labor": None, "exp": None, "errors": []}
+    ext = {"gni": None, "dist": None, "labor": None, "bop": None, "exp": None, "errors": []}
     if "extras" in cfg:
         xr = extras.collect(cfg, fetcher, f"{now.year}Q4", f"{now.year}{now.month:02d}")
         ext["errors"] = xr.pop("_errors", [])
@@ -392,6 +392,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         for name, fn in [("gni", lambda: extras.gni_section(xr, raw["px"], raw["pm"], annual)),
                          ("dist", lambda: extras.dist_section(xr)),
                          ("labor", lambda: extras.labor_section(xr, annual)),
+                         ("bop", lambda: bop.section(os.environ.get("ECOS_API_KEY"), data_dir, now)),
                          ("exp", lambda: extras.exp_section(cfg, xr, levels, esi, list(real_nc), prod))]:
             try:
                 ext[name] = fn()
@@ -448,7 +449,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         "customs": customs_used,
         "chips": chips,
         "esi": {"last": str(esi.index.max()), "value": r(esi.iloc[-1], 1)},
-        "gni": ext["gni"], "dist": ext["dist"], "labor": ext["labor"], "expenditure": ext["exp"],
+        "gni": ext["gni"], "dist": ext["dist"], "labor": ext["labor"], "bop": ext["bop"], "expenditure": ext["exp"],
         "releases": upcoming,
         "alerts": alerts,
     }
@@ -469,6 +470,11 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
     if ext["labor"] and ext["labor"].get("est"):
         e = ext["labor"]["est"]
         print(f"{e['year']}년 노동소득분배율 ≈ {e['ls']:.1f}% ({e['year'] - 1}년 {e['prev']:.1f}%)")
+    if ext["bop"] and ext["bop"].get("quarters"):
+        b = ext["bop"]["quarters"][-1]
+        print(f"경상수지 {b['q']}: 한국 {b['KR']} · 중국 {b['CN']} · 독일 {b['DE']} · 일본 {b['JP']} (억달러)")
+    elif "extras" in cfg:
+        print("경상수지: 자료 없음 — data/bop_codes.json 후보 목록 확인")
     if ext["exp"]:
         for row in ext["exp"]["rows"]:
             if row["est"]:
