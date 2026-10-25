@@ -39,8 +39,17 @@ def collect(cfg: dict, fetcher) -> dict:
     groups = [("bridge", cfg["bridge"]), ("aux", cfg["aux"]), ("deflator", cfg["deflator"]["bridge"])]
     for _, grp in groups:
         for k, s in grp.items():
-            raw[k] = fetcher(s["stat"], "M", cfg["monthly_start"], end_m, s["items"])
-            if raw[k].empty:
+            cyc = s.get("cycle", "M")
+            start, end = ((f"{today.year - 1}0101", today.strftime("%Y%m%d")) if cyc == "D"
+                          else (cfg["monthly_start"], end_m))
+            try:
+                raw[k] = fetcher(s["stat"], cyc, start, end, s["items"])
+            except Exception as e:  # noqa: BLE001
+                if not s.get("optional"):
+                    raise
+                print(f"::warning::선택 지표 {k} 수집 실패({type(e).__name__}) — 없이 진행")
+                raw[k] = pd.Series(dtype=float)
+            if raw[k].empty and not s.get("optional"):
                 raise RuntimeError(f"빈 시계열: {k} ({s['stat']} {s['items']})")
     return raw
 
@@ -65,7 +74,16 @@ def build_levels(cfg: dict, raw: dict, now: datetime | None = None):
     for k, s in cfg["deflator"]["bridge"].items():
         x = raw[k]
         actual_last = x.index.max()
-        if s.get("split_chip") and raw.get(s["split_chip"]) is not None:
+        fx = raw.get(s.get("fx", ""))
+        if s.get("fx") and fx is not None and not fx.empty and raw.get(s["usd"]) is not None:
+            # 원화 수출물가 = 달러 가격(반도체·기타 추세 연장) × 실제 환율(일별 원/달러) — 환율은 추세로 늘리지 않음
+            through = pd.Period(f"{(now or datetime.now(KST)).year}-12", "M")
+            x, info = adjust.extend_krw_by_fx(x, raw[s["usd"]], raw.get(s.get("usd_chip", "")), fx, through)
+            ext_info[k] = info
+            if info.get("added"):
+                print(f"::notice::{s['label']} {info['from']}~{info['to']} = 달러가격 추세[{info['method']}, 반도체 월 "
+                      f"{info['chip_trend']:+.1f}% · 기타 월 {info['other_trend']:+.1f}%] × 실제 환율 {info['fx_text']}")
+        elif s.get("split_chip") and raw.get(s["split_chip"]) is not None:
             # 수출물가 미발표 달(연말까지): 반도체 단가 추세를 따로 반영해 연장 → AR 외삽 대신 사용
             through = pd.Period(f"{(now or datetime.now(KST)).year}-12", "M")
             x, info = adjust.extend_split(x, raw[s["split_chip"]], through)

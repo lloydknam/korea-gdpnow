@@ -20,6 +20,8 @@ def _to_period(t: str, cycle: str) -> pd.Period:
         return pd.Period(t, freq="Q")
     if cycle == "A":
         return pd.Period(t, freq="Y")
+    if cycle == "D":
+        return pd.Period(f"{t[:4]}-{t[4:6]}-{t[6:8]}", freq="D")
     raise ValueError(cycle)
 
 

@@ -151,6 +151,43 @@ def extend_split(total: pd.Series, chip: pd.Series | None, through: pd.Period, w
                               "added": k - 1, "from": str(t0 + 1), "to": str(through)}
 
 
+def extend_krw_by_fx(krw: pd.Series, usd: pd.Series, chip_usd: pd.Series | None, fx_daily: pd.Series,
+                     through: pd.Period, recent_days: int = 5):
+    """원화 가격지수 미발표 달 = 달러 가격지수(반도체·기타 추세 연장) × 환율.
+    환율: 원화÷달러 지수 비율(실효 환율)을 원/달러 월평균에 맞춘 뒤(k = F/E, 마지막 실적 달),
+    미발표 달은 실제 원/달러 월평균(이번 달은 지금까지 평균), 아직 안 온 달은 최근 5영업일 평균 유지."""
+    t = krw.dropna()
+    last = t.index.max()
+    if last >= through:
+        return t, {"method": "actual", "added": 0}
+    d_ext, info = extend_split(usd, chip_usd, through)
+    fx = fx_daily.dropna()
+    fx = fx[(fx > 300) & (fx < 5000)]              # 원/달러 범위 밖 값은 버림
+    em = fx.groupby(fx.index.asfreq("M")).mean()
+    em.index = pd.PeriodIndex(em.index, freq="M")
+    F = (t / usd.reindex(t.index)).dropna()
+    if last not in em.index or last not in F.index:
+        return t, {"method": "fx-missing", "added": 0}
+    k = F[last] / em[last]
+    cur = float(fx.tail(recent_days).mean())
+    out = t.copy()
+    used = {}
+    p = last + 1
+    while p <= through:
+        e = float(em[p]) if p in em.index else cur
+        used[str(p)] = round(e, 1)
+        out.loc[p] = d_ext[p] * k * e
+        p += 1
+    e0 = float(em[last])
+    parts = [f"{int(m[5:])}월 {v:,.0f}원" + ("(지금까지 평균)" if pd.Period(m, "M") == fx.index.max().asfreq("M") else "")
+             for m, v in used.items() if pd.Period(m, "M") in em.index]
+    tail = f", 이후 최근 {recent_days}영업일 {cur:,.0f}원 유지" if any(pd.Period(m, "M") not in em.index for m in used) else ""
+    info.update({"fx_base": round(e0, 1), "fx_used": used, "fx_recent": round(cur, 1), "fx_k": round(float(k), 4),
+                 "fx_text": f"{last.month}월 {e0:,.0f}원 → " + ", ".join(parts) + tail,
+                 "added": len(used), "from": str(last + 1), "to": str(through)})
+    return out.sort_index(), info
+
+
 def price_yoy_nowcast(px_usd: pd.Series, chip_px: pd.Series | None, ref: pd.Period, w: float | None = None):
     """미발표 달의 수출물가(달러) 전년동월비. 반도체·비반도체를 나눠 각자 최근 추세(감쇠)로 연장.
     반환: (전년동월비, 방법). 발표된 달이면 실적 그대로."""

@@ -111,9 +111,18 @@ def make(seed=7):
         ("402Y014", "*AA", "D"): px_usd[m], ("402Y014", "3091AA", "D"): chip_px[m],
         ("402Y014", "*AA", "W"): px_krw[m], ("401Y015", "*AA", "W"): pm_krw[m],
         ("402Y014", "3091AA", "W"): (chip_px * px_krw / px_usd)[m],
+        ("731Y001", "0000001"): _fx_daily(px_krw / px_usd),
         ("901Y009", "0"): cpi[idx <= CPI_END],
         ("513Y001", "E1000"): esi,
     }
+
+
+def _fx_daily(ratio_m):
+    """합성 일별 원/달러: 월간 지수 비율 × 1150, 2026-10-23까지(이번 달은 일부만)."""
+    days = pd.period_range("2025-01-01", "2026-10-23", freq="D")
+    days = days[[d.dayofweek < 5 for d in days]]
+    m = ratio_m.reindex([d.asfreq("M") for d in days]).ffill().values
+    return pd.Series(1150 * m, index=days).dropna()
 
 
 def fetcher_from(data):

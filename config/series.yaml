@@ -62,6 +62,12 @@ aux:
     label: 반도체 수출물가(원화)
     stat: "402Y014"
     items: ["3091AA", W]
+  usdkrw:
+    label: 원/달러 환율(일별)
+    stat: "731Y001"     # 주요국 통화의 대원화환율(일별)
+    cycle: D
+    items: ["0000001"]  # 원/미국달러(매매기준율)
+    optional: true      # 못 받아도 본 추정은 진행(→ 원화 가격 추세 연장으로 대체)
   all_ind:
     label: 전산업생산
     stat: "901Y033"
@@ -88,7 +94,10 @@ deflator:
       label: 수출물가(원화)
       stat: "402Y014"
       items: ["*AA", W]
-      split_chip: chip_px_krw   # 미발표 달: 반도체·비반도체 나눠 추세 연장(AR 대신)
+      usd: xp_usd               # 미발표 달 = 달러 가격(반도체·기타 추세 연장) × 실제 원/달러
+      usd_chip: chip_px
+      fx: usdkrw
+      split_chip: chip_px_krw   # 환율 자료가 없을 때 대체: 원화 가격을 반도체·기타로 나눠 추세 연장
       source: 한국은행
     pm:
       label: 수입물가(원화)
