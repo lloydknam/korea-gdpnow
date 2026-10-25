@@ -1005,8 +1005,9 @@ function renderMethod() {
     ["실질수출", [
       "한은 수출물량지수(STL 계절조정 + 영업일 보정) → 반도체 단가 효과 제거",
       "물량지수 미발표 월: 관세청 10일·20일·월 속보 금액 증가율 ÷ 수출물가(달러) 증가율",
+      "수출물가도 미발표인 달: 반도체·비반도체로 나눠 각자 최근 3개월 추세로 연장(반도체 비중은 자료에서 추정) → 단가 급등기에 물량 과대추정 방지",
       "속보 반영 비중: 10일 50% · 20일 80% · 월 100%, 명절 이동(조업일수 2일 이상 차이) 시 절반 → 나머지는 직전 달 물량 증가율",
-      ...DATA.customs.map(c => `반영: ${c.month}(${({ d10: "10일", d20: "20일", m: "월" })[c.period] || c.period}) 금액 ${fmt(c.value_yoy, 1)}% − 단가 ${fmt(c.price_yoy, 1)}%${c.price_assumed ? "(직전 달)" : ""} → 속보 물량 ${fmt(c.flash_volume_yoy ?? c.volume_yoy, 1)}%` +
+      ...DATA.customs.map(c => `반영: ${c.month}(${({ d10: "10일", d20: "20일", m: "월" })[c.period] || c.period}) 금액 ${fmt(c.value_yoy, 1)}% − 단가 ${fmt(c.price_yoy, 1)}%${c.price_assumed ? "(추세 연장)" : ""} → 속보 물량 ${fmt(c.flash_volume_yoy ?? c.volume_yoy, 1)}%` +
         (c.weight != null && c.weight < 1 ? ` × ${c.weight} + 직전 달 ${fmt(c.prior_yoy, 1)}% × ${(1 - c.weight).toFixed(2)} = ${fmt(c.volume_yoy, 1)}%` : ""))]],
     ["계수 재추정", [
       "GDP 신규 발표·개정 시에만",

@@ -53,7 +53,10 @@ def build_levels(cfg: dict, raw: dict):
         actual_last = x.index.max()
         if s.get("customs_flash"):
             flash = adjust.load_customs(ROOT / "data" / "customs_flash.csv")
-            x, customs_used = adjust.extend_with_customs(x, raw["xp_usd"], flash)
+            x, customs_used = adjust.extend_with_customs(x, raw["xp_usd"], flash, raw.get("chip_px"))
+            for c in customs_used:
+                print(f"::notice::속보 환산 {c['month']}({c['period']}): 금액 {c['value_yoy']:+.1f}% ÷ 단가 {c['price_yoy']:+.1f}%"
+                      f"[{c['price_method']}, 기존 방식 {c['price_yoy_naive']}%] → 물량 {c['volume_yoy']:+.1f}% (반영 {c['weight']})")
         if s.get("seasonal_adjust"):
             x = adjust.seasonal_adjust(x)
         levels[k] = x

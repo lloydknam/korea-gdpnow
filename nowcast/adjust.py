@@ -101,7 +101,49 @@ def flash_weight(row) -> float:
     return w
 
 
-def extend_with_customs(vol_nsa: pd.Series, px_usd: pd.Series, flash: pd.DataFrame):
+CHIP_W_DEFAULT = 0.19   # 수출물가지수 2020년 가중치에서 반도체 비중 근사
+
+
+def chip_weight(px_usd: pd.Series, chip_px: pd.Series, months: int = 36) -> float:
+    """총지수 ≈ w·반도체 + (1−w)·비반도체(지수 수준, 라스파이레스). 비반도체 월간 변동이 가장 매끄러운 w를 고름."""
+    j = pd.concat([px_usd.rename("t"), chip_px.rename("c")], axis=1).dropna().tail(months + 1)
+    if len(j) < 13:
+        return CHIP_W_DEFAULT
+    best, best_sd = CHIP_W_DEFAULT, np.inf
+    for w in np.arange(0.05, 0.401, 0.01):
+        n = (j["t"] - w * j["c"]) / (1 - w)
+        if (n <= 0).any():
+            continue
+        sd = float(np.log(n).diff().std())
+        if sd < best_sd:
+            best, best_sd = float(w), sd
+    return best
+
+
+def price_yoy_nowcast(px_usd: pd.Series, chip_px: pd.Series | None, ref: pd.Period, w: float | None = None):
+    """미발표 달의 수출물가(달러) 전년동월비. 반도체·비반도체를 나눠 각자 최근 3개월 추세로 연장.
+    반환: (전년동월비, 방법). 발표된 달이면 실적 그대로."""
+    px = px_usd.dropna()
+    if ref in px.index and (ref - 12) in px.index:
+        return float(px[ref] / px[ref - 12] - 1), "actual"
+    last = px.index.max()
+    if chip_px is None or chip_px.dropna().empty or (ref - 12) not in px.index:
+        yoy = (px / px.shift(12) - 1).dropna()
+        return (float(yoy.iloc[-1]) if len(yoy) else 0.0), "last"
+    c = chip_px.dropna()
+    t0 = min(last, c.index.max())
+    w = chip_weight(px, c) if w is None else w
+    n = (px - w * c.reindex(px.index)) / (1 - w)
+    gc = float(np.log(c[c.index <= t0]).diff().tail(3).mean())
+    gn = float(np.log(n[n.index <= t0].dropna()).diff().tail(3).mean())
+    k = (ref - t0).n
+    c_ref = c[t0] * np.exp(gc * k)
+    n_ref = n[t0] * np.exp(gn * k)
+    t_ref = w * c_ref + (1 - w) * n_ref
+    return float(t_ref / px[ref - 12] - 1), f"split(w={w:.2f})"
+
+
+def extend_with_customs(vol_nsa: pd.Series, px_usd: pd.Series, flash: pd.DataFrame, chip_px: pd.Series | None = None):
     """수출물량지수(원계열)가 없는 월을 관세청 속보 금액 증가율 ÷ 수출물가(달러) 증가율로 보강.
     물량 증가율 = w × 속보 환산치 + (1−w) × 직전 달 물량 증가율 (w: 10일 0.5 / 20일 0.8 / 월 1.0, 명절 이동 시 절반)."""
     used = []
@@ -116,7 +158,8 @@ def extend_with_customs(vol_nsa: pd.Series, px_usd: pd.Series, flash: pd.DataFra
         cand = flash[flash["ref"] == ref].sort_values(["rank"])
         row = cand.iloc[-1]
         val_yoy = customs_full_month_yoy(row)
-        px_yoy = px_yoy_all.get(ref, px_yoy_all.iloc[-1] if len(px_yoy_all) else 0.0)
+        # 수출물가 미발표 달: 반도체·비반도체 각자의 최근 추세로 연장(반도체 단가 급등기에 '직전 달 그대로'보다 정확)
+        px_yoy, px_how = price_yoy_nowcast(px_usd, chip_px, ref)
         base, prev, prev12 = out.get(ref - 12), out.get(ref - 1), out.get(ref - 13)
         if base is None or np.isnan(base):
             break
@@ -135,5 +178,7 @@ def extend_with_customs(vol_nsa: pd.Series, px_usd: pd.Series, flash: pd.DataFra
             "weight": round(w, 2),
             "volume_yoy": round(float(vol_yoy) * 100, 1),
             "price_assumed": ref not in px_yoy_all.index,
+            "price_method": px_how,
+            "price_yoy_naive": round(float(px_yoy_all.iloc[-1]) * 100, 1) if len(px_yoy_all) else None,
         })
     return out, used
