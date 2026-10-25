@@ -222,7 +222,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 
   <section>
     <h2>월별 지표</h2>
-    <p class="sub">전월비(%, 계절조정) · 지표마다 세로 눈금이 다름</p>
+    <p class="sub">전월비(%, 계절조정) · 지표마다 세로 눈금이 다름 · 회색 바탕 = 선택한 분기</p>
     <div class="legend"><span><i class="key sq"></i>실적</span><span><i class="key" style="background:var(--cmp1)"></i>관세청 속보 반영</span><span><i class="key hatch"></i>미발표 — 모형 추정</span></div>
     <div class="mini" id="mini"></div>
   </section>
@@ -621,7 +621,11 @@ function renderHist() {
 // ================================================================ 월별 지표
 function renderMini() {
   const box = $("#mini"); box.replaceChildren();
-  DATA.targets[cur].indicators.forEach(d => {
+  // 막대는 언제나 가장 먼 추정 분기 끝(예: 12월)까지, 선택한 분기의 세 달은 바탕색으로 표시
+  const far = DATA.targets[DATA.targets.length - 1], selQ = DATA.targets[cur].quarter;
+  const inSel = (mm) => { const y = +mm.slice(0, 4), mo = +mm.slice(5); return `${y}Q${Math.ceil(mo / 3)}` === selQ; };
+  DATA.targets[cur].indicators.forEach((d0, ii) => {
+    const d = { ...d0, months: (far.indicators[ii] || d0).months.slice(-15) };
     const ext = Math.max(0.5, ...d.months.map(x => Math.abs(x.mom)));
     const wrap = h("div"), head = h("h4", "", d.label);
     head.appendChild(h("span", "", `분기 ${fmt(d.x, 1)}% · 실적 ${d.actual_last.replace("-", ".")}까지 · 눈금 ±${ext < 10 ? ext.toFixed(1) : Math.round(ext)}%`));
@@ -634,11 +638,13 @@ function renderMini() {
     el("line", { x1: 0, y1: 0, x2: 0, y2: 5, stroke: css("--main"), "stroke-width": 2.6 }, pt);
     const Y = v => m.t + (H - m.t - m.b) * (1 - (v + ext) / (2 * ext));
     const n = d.months.length, band = W / n, bw = Math.min(14, band - 3), tip = tipFor(cb);
+    d.months.forEach((p, i) => { if (inSel(p.m)) el("rect", { x: band * i, y: 0, width: band, height: H - m.b + 2, fill: css("--chip") }, svg); });
     d.months.forEach((p, i) => { if (+p.m.slice(5) % 3 === 1 && i) el("line", { x1: band * i, x2: band * i, y1: m.t, y2: H - m.b, stroke: css("--grid") }, svg); });
     el("line", { x1: 0, x2: W, y1: Y(0), y2: Y(0), stroke: css("--axis") }, svg);
     d.months.forEach((p, i) => {
       const x = band * i + (band - bw) / 2, g = el("g", { tabindex: 0 }, svg);
-      el("path", { d: barPath(x, bw, Y(0), Y(p.mom), 2), fill: p.filled ? `url(#${pid})` : (p.flash ? css("--cmp1") : css("--main")) }, g);
+      const y1 = Math.abs(Y(p.mom) - Y(0)) < 2 ? Y(0) - (p.mom >= 0 ? 2 : -2) : Y(p.mom);  // 0 근처 값도 막대가 보이게
+      el("path", { d: barPath(x, bw, Y(0), y1, 2), fill: p.filled ? `url(#${pid})` : (p.flash ? css("--cmp1") : css("--main")) }, g);
       const mm = +p.m.slice(5);
       if (mm % 3 === 1) txt(svg, x + bw / 2, H - 3, mm === 1 ? `'${p.m.slice(2, 4)}.1` : mm + "월", { "text-anchor": "middle" });
       el("rect", { x: band * i, y: 0, width: band, height: H, fill: "transparent" }, g);
