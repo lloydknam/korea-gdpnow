@@ -58,6 +58,10 @@ aux:
     label: 반도체 수출물가(달러)
     stat: "402Y014"
     items: ["3091AA", D]
+  chip_px_krw:
+    label: 반도체 수출물가(원화)
+    stat: "402Y014"
+    items: ["3091AA", W]
   all_ind:
     label: 전산업생산
     stat: "901Y033"
@@ -84,6 +88,7 @@ deflator:
       label: 수출물가(원화)
       stat: "402Y014"
       items: ["*AA", W]
+      split_chip: chip_px_krw   # 미발표 달: 반도체·비반도체 나눠 추세 연장(AR 대신)
       source: 한국은행
     pm:
       label: 수입물가(원화)

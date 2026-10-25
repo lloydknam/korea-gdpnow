@@ -110,6 +110,7 @@ def make(seed=7):
         ("403Y002", "*AA"): ex_nsa[m], ("403Y002", "3091AA"): chip_vol[m],
         ("402Y014", "*AA", "D"): px_usd[m], ("402Y014", "3091AA", "D"): chip_px[m],
         ("402Y014", "*AA", "W"): px_krw[m], ("401Y015", "*AA", "W"): pm_krw[m],
+        ("402Y014", "3091AA", "W"): (chip_px * px_krw / px_usd)[m],
         ("901Y009", "0"): cpi[idx <= CPI_END],
         ("513Y001", "E1000"): esi,
     }

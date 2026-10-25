@@ -45,7 +45,7 @@ def collect(cfg: dict, fetcher) -> dict:
     return raw
 
 
-def build_levels(cfg: dict, raw: dict):
+def build_levels(cfg: dict, raw: dict, now: datetime | None = None):
     levels, meta = {}, {}
     customs_used = []
     for k, s in cfg["bridge"].items():
@@ -61,10 +61,20 @@ def build_levels(cfg: dict, raw: dict):
             x = adjust.seasonal_adjust(x)
         levels[k] = x
         meta[k] = {"actual_last": actual_last, "last": x.index.max()}
+    ext_info = {}
     for k, s in cfg["deflator"]["bridge"].items():
         x = raw[k]
+        actual_last = x.index.max()
+        if s.get("split_chip") and raw.get(s["split_chip"]) is not None:
+            # 수출물가 미발표 달(연말까지): 반도체 단가 추세를 따로 반영해 연장 → AR 외삽 대신 사용
+            through = pd.Period(f"{(now or datetime.now(KST)).year}-12", "M")
+            x, info = adjust.extend_split(x, raw[s["split_chip"]], through)
+            ext_info[k] = info
+            if info.get("added"):
+                print(f"::notice::{s['label']} {info['from']}~{info['to']} 추세 연장 [{info['method']}] "
+                      f"반도체 월 {info['chip_trend']:+.1f}% · 기타 월 {info['other_trend']:+.1f}% (달마다 70%로 감쇠)")
         levels[k] = adjust.seasonal_adjust(x) if s.get("seasonal_adjust") else x
-        meta[k] = {"actual_last": x.index.max(), "last": x.index.max()}
+        meta[k] = {"actual_last": actual_last, "last": x.index.max(), "ext": ext_info.get(k)}
     return levels, meta, customs_used
 
 
@@ -187,7 +197,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
 
     raw = collect(cfg, fetcher)
     gdp = raw["gdp"]
-    levels, meta, customs_used = build_levels(cfg, raw)
+    levels, meta, customs_used = build_levels(cfg, raw, now)
     esi = raw["esi"]
     keys = list(cfg["bridge"].keys())
     labels = {k: cfg["bridge"][k]["label"] for k in keys}
@@ -331,7 +341,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
             for x in str(row.get("new_data") or "").split("|"):
                 if x and x not in run_new:
                     run_new.append(x)
-        dthrough = {k: str(meta[k]["last"]) for k in dkeys}
+        dthrough = {k: str(meta[k]["actual_last"]) for k in dkeys}
         dprev = state.get("defl_through") or {}
         if dprev:
             run_new += [dlabels[k] for k in dkeys if dprev.get(k) != dthrough[k] and dlabels[k] not in run_new]
@@ -444,7 +454,8 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
                    "n": bridge["n"], "sample": bridge["sample"], "estimated_at": bridge.get("estimated_at")},
         "backtest": {kk: bt[kk] for kk in ("rmse", "mae", "ar_rmse", "n", "period")},
         "annual": annual,
-        "deflator": {"const": r(dbridge["const"], 3), "coef": {k: r(v, 3) for k, v in dbridge["coef"].items()},
+        "deflator": {"ext": {k: meta[k].get("ext") for k in dkeys if meta[k].get("ext")},
+                     "const": r(dbridge["const"], 3), "coef": {k: r(v, 3) for k, v in dbridge["coef"].items()},
                      "labels": dlabels, "r2": r(dbridge["r2"], 3), "sd": r(dbridge["sd"], 2),
                      "sample": dbridge["sample"], "rmse": dbt["rmse"],
                      "last": {"q": str(defl.dropna().index.max()), "v": r(defl.dropna().iloc[-1])}},

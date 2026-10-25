@@ -120,27 +120,48 @@ def chip_weight(px_usd: pd.Series, chip_px: pd.Series, months: int = 36) -> floa
     return best
 
 
+TREND_DECAY = 0.7   # 추세 연장 시 달마다 기울기를 70%로 줄임(먼 달일수록 보수적)
+
+
+def extend_split(total: pd.Series, chip: pd.Series | None, through: pd.Period, w: float | None = None,
+                 months: int = 3, decay: float = TREND_DECAY):
+    """물가 총지수를 through 월까지 연장. 총지수 ≈ w·반도체 + (1−w)·비반도체(지수 수준)로 나눠
+    각자 최근 months개월 로그 추세를 감쇠시키며 연장 → 합침. 반환: (연장된 총지수, 정보 dict)."""
+    t = total.dropna()
+    last = t.index.max()
+    if last >= through:
+        return t, {"method": "actual", "added": 0}
+    if chip is None or chip.dropna().empty:
+        return t, {"method": "none", "added": 0}
+    c = chip.dropna()
+    t0 = min(last, c.index.max())
+    w = chip_weight(t, c) if w is None else w
+    n = ((t - w * c.reindex(t.index)) / (1 - w)).dropna()
+    n = n[n > 0]
+    gc = float(np.log(c[c.index <= t0]).diff().tail(months).mean())
+    gn = float(np.log(n[n.index <= t0]).diff().tail(months).mean())
+    out = t[t.index <= t0].copy()
+    lc, ln, cum = c[t0], n[t0], 0.0
+    p, k = t0 + 1, 1
+    while p <= through:
+        cum += decay ** (k - 1)
+        out.loc[p] = w * lc * np.exp(gc * cum) + (1 - w) * ln * np.exp(gn * cum)
+        p, k = p + 1, k + 1
+    return out.sort_index(), {"method": f"split(w={w:.2f})", "w": w, "chip_trend": gc * 100, "other_trend": gn * 100,
+                              "added": k - 1, "from": str(t0 + 1), "to": str(through)}
+
+
 def price_yoy_nowcast(px_usd: pd.Series, chip_px: pd.Series | None, ref: pd.Period, w: float | None = None):
-    """미발표 달의 수출물가(달러) 전년동월비. 반도체·비반도체를 나눠 각자 최근 3개월 추세로 연장.
+    """미발표 달의 수출물가(달러) 전년동월비. 반도체·비반도체를 나눠 각자 최근 추세(감쇠)로 연장.
     반환: (전년동월비, 방법). 발표된 달이면 실적 그대로."""
     px = px_usd.dropna()
     if ref in px.index and (ref - 12) in px.index:
         return float(px[ref] / px[ref - 12] - 1), "actual"
-    last = px.index.max()
     if chip_px is None or chip_px.dropna().empty or (ref - 12) not in px.index:
         yoy = (px / px.shift(12) - 1).dropna()
         return (float(yoy.iloc[-1]) if len(yoy) else 0.0), "last"
-    c = chip_px.dropna()
-    t0 = min(last, c.index.max())
-    w = chip_weight(px, c) if w is None else w
-    n = (px - w * c.reindex(px.index)) / (1 - w)
-    gc = float(np.log(c[c.index <= t0]).diff().tail(3).mean())
-    gn = float(np.log(n[n.index <= t0].dropna()).diff().tail(3).mean())
-    k = (ref - t0).n
-    c_ref = c[t0] * np.exp(gc * k)
-    n_ref = n[t0] * np.exp(gn * k)
-    t_ref = w * c_ref + (1 - w) * n_ref
-    return float(t_ref / px[ref - 12] - 1), f"split(w={w:.2f})"
+    ext, info = extend_split(px, chip_px, ref, w)
+    return float(ext[ref] / px[ref - 12] - 1), info["method"]
 
 
 def extend_with_customs(vol_nsa: pd.Series, px_usd: pd.Series, flash: pd.DataFrame, chip_px: pd.Series | None = None):
