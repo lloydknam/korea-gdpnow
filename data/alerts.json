@@ -7,7 +7,7 @@
   "ref_period": "2026Q3",
   "date": "2026-10-22",
   "est": true,
-  "days": 4,
+  "days": 5,
   "fix": "예상 발표일 기준 — 실제 일정이 다르면 config/releases.yaml의 fixed에 날짜 기입"
  }
 ]
