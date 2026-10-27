@@ -236,11 +236,13 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         bridge = bridge_prev
 
     # 2) 속보치 기록 (처음 관측된 값 = 속보치)
+    new_actuals = []  # 이번 실행에서 처음 반영된 한은 GDP 속보치 (이력 주석용)
     for q, v in gdp.dropna().items():
         qs = str(q)
         if qs not in state["actuals"] and qs in state["runs"]:
             state["actuals"][qs] = {"advance": r(v), "final_nowcast": state["runs"][qs]["value"],
                                     "recorded_at": now.isoformat(timespec="minutes")}
+            new_actuals.append(f"한은 {q.quarter}분기 GDP 속보치({r(v):.1f}%)")
 
     # 3) 백테스트 (정보량별 오차)
     bt = model.backtest(levels, esi, gdp, mcfg, keys)
@@ -262,6 +264,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         _same = lambda old, new: old == new if (old is None or "|" in old) else old == new.split("|")[1]
         new_data = [labels[k] for k in keys
                     if prev and not _same(prev.get("through", {}).get(k), through[k])]
+        new_data = new_data + [x for x in new_actuals if x not in new_data]
         changed = (prev is None or abs(prev["value"] - nc["value"]) >= 0.005 or new_data
                    or (prev.get("bridge", {}).get("id") != bridge["id"]))
         if changed:
@@ -371,7 +374,8 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         ah_path = data_dir / "annual_history.csv"
         ah = pd.read_csv(ah_path) if ah_path.exists() else pd.DataFrame(columns=["run_at", "year", "real", "nominal"])
         last = ah[ah["year"] == year].tail(1)
-        if last.empty or abs(float(last["real"].iloc[0]) - ann["real"]) >= 0.005 \
+        run_new += [x for x in new_actuals if x not in run_new]
+        if last.empty or new_actuals or abs(float(last["real"].iloc[0]) - ann["real"]) >= 0.005 \
                 or abs(float(last["nominal"].iloc[0]) - ann["nominal"]) >= 0.005:
             if not last.empty:
                 annual["change"] = {"at": now.isoformat(timespec="minutes"),
