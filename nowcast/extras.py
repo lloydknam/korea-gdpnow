@@ -246,7 +246,8 @@ def exp_section(cfg: dict, raw: dict, levels: dict, esi: pd.Series, targets: lis
         c = {k: (cur[k] - prev[k]) / prev["gdp"] * 100 for k in ("pc", "gc", "ci", "ei")}
         c["nx"] = ((cur["x"] - prev["x"]) - (cur["m"] - prev["m"])) / prev["gdp"] * 100
         c["other"] = g - sum(c.values())
-        return {"gdp": g, **c}
+        gr = {k: _r((cur[k] / prev[k] - 1) * 100) for k in ("pc", "gc", "ci", "ei", "x", "m")}
+        return {"gdp": g, **c, "growth": gr}
 
     hist = {q: contrib(L.loc[q].to_dict(), L.loc[q - 1].to_dict()) for q in L.index[1:] if (q - 1) in L.index}
 
@@ -305,9 +306,9 @@ def exp_section(cfg: dict, raw: dict, levels: dict, esi: pd.Series, targets: lis
 
     def row(q, d, is_est):
         out = {"q": str(q), "est": is_est, "gdp": _r(d["gdp"]), **{k: _r(d[k], 3) for k in EXP_SHOW}}
+        out["growth"] = d.get("growth")
         if is_est:
             out["prod"] = _r(prod.get(q))
-            out["growth"] = d["growth"]
         return out
 
     rows = [row(q, hist[q], False) for q in sorted(hist)[-6:]] + [row(q, est[q], True) for q in sorted(est)]
