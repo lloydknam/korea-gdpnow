@@ -741,7 +741,7 @@ function renderGNI() {
   const tiles = $("#gni-tiles"); tiles.replaceChildren();
   if (G.annual) {
     const a = G.annual, tl = h("div", "tiles");
-    [[`${a.year}년 실질 GDP`, fmt(a.gdp, 1, false), "%", "생산 측 추정"], [`${a.year}년 실질 GNI`, "≈" + fmt(a.gni, 1, false), "%", `${a.n_actual}분기 발표+추정`],
+    [[`${a.year}년 실질 GDP`, fmt(a.gdp, 1, false), "%", "생산 측 추정"], [`${a.year}년 실질 GNI`, "≈" + fmt(a.gni, 1, false), "%", `${a.n_actual}분기 발표${a.n_adv ? `+${a.n_adv}분기 GDI 속보` : ""}+추정`],
      ["차이", fmt(a.gap, 1), "%p", "교역조건 효과 등"]].forEach(([l, v, u, n]) => {
       const c = h("div"); c.appendChild(h("div", "t-l", l)); const vv = h("div", "t-v", v); vv.appendChild(h("small", "", u)); c.appendChild(vv); c.appendChild(h("div", "t-n", n)); tl.appendChild(c);
     });
@@ -1027,7 +1027,8 @@ function renderMethod() {
     DATA.gni && ["부가: 실질 GNI (교역조건)", [
       "실질 GNI − 실질 GDP = 교역조건 효과(실질무역손익) + 국외순수취요소소득",
       `차이 = ${DATA.gni.fit.a.toFixed(2)} + ${DATA.gni.fit.b.toFixed(2)} × 교역조건(수출물가÷수입물가, 원화) 전년동기비 · R² ${DATA.gni.fit.r2.toFixed(2)}`,
-      "추정 분기: 실질 GDP 실시간 추정 + 추정 차이"]],
+      "추정 분기: 실질 GDP 실시간 추정 + 추정 차이",
+      "한은 GDP 속보치가 나온 분기(GNI 잠정치 전): 실질 GDI 전년동기비에 GNI를 맞춤 (국외순수취요소소득 차이는 0으로 가정), 잠정치가 나오면 실제 GNI로 교체"]],
     DATA.bop && ["부가: 경상수지", [
       "IMF 주요국 경상수지(한국·중국·독일·일본, 분기) + 한국 월별 국제수지, 한은 ECOS 수록 자료",
       "통계표 번호는 고정하지 않고 실행 때 이름으로 찾음 → 표 번호가 바뀌어도 자동 추적"]],

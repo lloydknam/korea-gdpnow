@@ -69,7 +69,10 @@ def tot_yoy(px: pd.Series, pm: pd.Series, q: pd.Period) -> tuple[float | None, i
     return (tot[ms].mean() / tot[[m - 12 for m in ms]].mean() - 1) * 100, len(ms)
 
 
-def gni_section(raw: dict, px: pd.Series, pm: pd.Series, annual: dict | None) -> dict | None:
+def gni_section(raw: dict, px: pd.Series, pm: pd.Series, annual: dict | None,
+                gdi_adv: dict | None = None) -> dict | None:
+    """gdi_adv: {Period: 실질 GDI 전년동기비(%)} — 한은 속보치. GNI 잠정치 전까지 해당 분기 GNI를 GDI에 맞춘다
+    (GNI = GDI + 국외순수취요소소득 → 후자는 작다고 보고 0으로 둠; 교역조건 회귀 추정보다 속보치가 우선)."""
     gdp, gni = raw.get("inc_gdp_r"), raw.get("inc_gni_r")
     if gdp is None or gni is None or gdp.empty or gni.empty:
         return None
@@ -98,16 +101,20 @@ def gni_section(raw: dict, px: pd.Series, pm: pd.Series, annual: dict | None) ->
         else:
             last_tot = t
         gap = fit["a"] + fit["b"] * t
+        src = None
+        if gdi_adv and q in gdi_adv:  # 속보치 GDI가 있으면 회귀 추정 대신 GDI로 보정
+            gap, src = float(gdi_adv[q]) - float(yoy[q]["real"]), "gdi_adv"
         gaps[q] = gap
         rows.append({"q": str(q), "gdp": _r(yoy[q]["real"]), "gni": _r(yoy[q]["real"] + gap), "gap": _r(gap),
-                     "tot": _r(t, 1), "tot_months": k, "est": True})
+                     "tot": _r(t, 1), "tot_months": k, "est": True, **({"src": src} if src else {})})
     y = annual["year"]
     qs = pd.period_range(f"{y}Q1", f"{y}Q4", freq="Q")
     g4 = [float(j.loc[q, "gap"]) if q in j.index else gaps.get(q) for q in qs]
     if all(g is not None for g in g4):
         gap_y = float(np.mean(g4))
         out["annual"] = {"year": y, "gdp": annual["real"], "gni": _r(annual["real"] + gap_y), "gap": _r(gap_y),
-                         "n_actual": int(sum(q in j.index for q in qs))}
+                         "n_actual": int(sum(q in j.index for q in qs)),
+                         "n_adv": int(sum(1 for q in qs if q not in j.index and gdi_adv and q in gdi_adv))}
     return out
 
 

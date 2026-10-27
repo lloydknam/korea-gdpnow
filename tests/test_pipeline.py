@@ -49,6 +49,9 @@ def test_pipeline(tmp_root=None):
     # 부가 분석 ❹❺❻
     g = p2["gni"]
     assert g and g["annual"] and any(r["est"] for r in g["rows"]) and g["fit"]["r2"] > 0.5, g and g["fit"]
+    # 한은 속보치 GDI(data/gdi_advance.csv)가 있는 분기는 GNI를 GDI 전년동기비에 맞춘다
+    adv = [r for r in g["rows"] if r.get("src") == "gdi_adv"]
+    assert adv and adv[0]["q"] == "2026Q3" and abs(adv[0]["gni"] - 18.8) < 0.02 and g["annual"]["n_adv"] == 1, adv
     d = p2["dist"]
     assert d and len(d["rows"]) == 12 and abs(d["rows"][-1]["resid"]) < 3, d and d["rows"][-1]
     e = p2["expenditure"]

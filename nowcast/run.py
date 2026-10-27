@@ -424,7 +424,12 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         xr = extras.collect(cfg, fetcher, f"{now.year}Q4", f"{now.year}{now.month:02d}")
         ext["errors"] = xr.pop("_errors", [])
         prod = {q: v for q, (v, _, _) in real_nc.items()}
-        for name, fn in [("gni", lambda: extras.gni_section(xr, raw["px"], raw["pm"], annual)),
+        gdi_adv = {}
+        gp = data_dir / "gdi_advance.csv"  # 한은 속보치 실질 GDI(전년동기비) — GNI 잠정치 전까지 3Q 등 보정용
+        if gp.exists():
+            gdf = pd.read_csv(gp)
+            gdi_adv = {pd.Period(str(q), "Q"): float(v) for q, v in zip(gdf["quarter"], gdf["gdi_yoy"]) if pd.notna(v)}
+        for name, fn in [("gni", lambda: extras.gni_section(xr, raw["px"], raw["pm"], annual, gdi_adv)),
                          ("dist", lambda: extras.dist_section(xr)),
                          ("labor", lambda: extras.labor_section(xr, annual)),
                          ("bop", lambda: bop.section(os.environ.get("ECOS_API_KEY"), data_dir, now)),
