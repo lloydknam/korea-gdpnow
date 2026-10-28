@@ -931,18 +931,23 @@ function renderExp() {
   stackBars($("#c-exp"), E.rows, S, { total: "gdp", totalName: "실질 GDP", aria: "실질 GDP 지출 항목별 기여도",
     extra: r => r.est ? [{ v: `생산 측 ${fmt(r.prod)}%`, cls: "k" }] : [] });
   const more = $("#exp-more"); more.replaceChildren();
-  // 표: 최근 4개 분기, 항목 전기비(%) + 순수출·기타 기여도(%p). 추정 분기는 파란 글씨·*
+  // 표 두 개(최근 4개 분기): ① 항목 증가율(%) — 뉴스의 "민간소비 −0.2%" ② 기여도(%p) — 그래프 막대, 합 = GDP 증가율
   const tcols = E.rows.slice(-4), G = (r, k) => r.growth && r.growth[k] != null ? r.growth[k] : null;
+  const head = (t) => [t, ...tcols.map(r => qlab(r.q) + (r.est ? "*" : ""))];
   const tline = (name, f, d = 1) => [name, ...tcols.map(r => ({ v: f(r) == null ? "–" : fmt(f(r), d), est: r.est }))];
-  const tw = h("div"); tw.style.overflowX = "auto"; tw.style.marginTop = "10px";
-  tw.appendChild(smallTable(["전기비 %", ...tcols.map(r => qlab(r.q) + (r.est ? "*" : ""))], [
+  const table = (title, sub, hd, rows) => {
+    more.appendChild(h("h3", "", title)); more.appendChild(h("p", "sub", sub));
+    const tw = h("div"); tw.style.overflowX = "auto"; tw.appendChild(smallTable(hd, rows)); more.appendChild(tw);
+  };
+  table("항목별 증가율", "실질, 계절조정, 전기비(%) · 각 항목이 얼마나 늘었나", head("%"), [
     tline("GDP", r => r.gdp),
     tline("민간소비", r => G(r, "pc")), tline("정부소비", r => G(r, "gc")),
     tline("건설투자", r => G(r, "ci")), tline("설비투자", r => G(r, "ei")),
-    tline("수출", r => G(r, "x")), tline("수입", r => G(r, "m")),
-    tline("순수출 기여(%p)", r => r.nx, 2), tline("기타 기여(%p)", r => r.other, 2)]));
-  more.appendChild(tw);
-  more.appendChild(h("p", "note", "* 실시간 추정(파란 글씨). 실적은 한은 계절조정 실질 수준으로 계산 → 발표치와 반올림 차이 가능. 추정 분기 수출·수입은 물량지수 증가율"));
+    tline("수출", r => G(r, "x")), tline("수입", r => G(r, "m"))]);
+  table("성장기여도", "GDP 증가율을 항목별로 나눈 값(%p) = 항목 증가율 × GDP 비중 · 합 = GDP 증가율 · 그래프 막대와 같음", head("%p"), [
+    ...E.order.map(k => tline(E.labels[k], r => r[k], 2)),
+    tline("합계 = GDP", r => r.gdp, 2)]);
+  more.appendChild(h("p", "note", "* 실시간 추정(파란 글씨). 실적은 한은 계절조정 실질 수준으로 계산 → 발표치와 반올림 차이 가능. 추정 분기 수출·수입 증가율은 물량지수 기준. 순수출 = 수출 기여 − 수입 기여, 기타 = 지식재산투자·재고증감·통계상 불일치"));
   const d = h("details"); d.appendChild(h("summary", "", "지출 항목 브리지 (항목 전기비 ← 월간 지표)"));
   const e0 = est.length ? est[0] : null, g = e0 ? e0.growth : {};
   d.appendChild(smallTable(["항목", "지표", "계수", "R²", e0 ? `${qlab(e0.q)} 추정` : ""],
