@@ -832,7 +832,7 @@ function renderExports() {
   tb.lastChild.classList.add("sum"); more.appendChild(tb);
   const est = cur.filter(r => r.est);
   const nt = h("p", "note", `금액 억달러 · IT기기 = 무선통신·컴퓨터·디스플레이 · HS 코드 기준 품목군(산업부 15대 품목 분류와 조금 다름) · 출처: ${X0.src}` +
-    (est.length ? ` · ${est.map(r => +r.m.slice(5) + "월").join("·")} = 잠정치 합계·반도체 증감률${est.some(r => r.items_from && r.items_from.length > 1) ? "·품목 증감률" : ""}로 추정, 확정치(매월 15일경) 들어오면 교체` : ""));
+    (est.length ? ` · ${est.map(r => +r.m.slice(5) + "월").join("·")} = 잠정치 합계·반도체 증감률${est.some(r => r.items_from && r.items_from.length > 1) ? "·품목 증감률" : ""} + 품목군 최근 추세로 추정, 확정치(매월 15일경) 들어오면 교체` : ""));
   more.appendChild(nt);
 }
 
@@ -1205,7 +1205,7 @@ function renderMethod() {
     DATA.exports && ["부가: 품목별 수출액", [
       "관세청 품목별 수출입실적(공공데이터포털 API, 매월 15일경 전월 확정치) → 품목군 = HS 코드 묶음, 전체 = HS 2단위 류 합",
       DATA.exports.groups.filter(g => DATA.exports.hs[g.k]).map(g => `${g.label} ${DATA.exports.hs[g.k].map(c => (c[0] === "-" ? "−" + c.slice(1) : c) + (c.replace("-", "").length === 2 ? "류" : "")).join("·")}`).join(" / ") + " / 기타 = 전체 − 합",
-      "확정치 없는 달: 관세청 월간 잠정치 보도자료 → 전체 금액, 반도체·주요 품목 증감률 × 전년 같은 달 (품목 증감률 없으면 '반도체 외' 증감률)"]],
+      "확정치 없는 달: 관세청 월간 잠정치 보도자료 → 전체 금액, 반도체·주요 품목 증감률 × 전년 같은 달 · 증감률 없는 품목군은 최근 3개월 추세로 나눈 뒤 잠정치 합계에 맞게 비례 조정"]],
     DATA.dist && ["부가: 분배 (소득 측)", [
       "경상 GDP = 피용자보수 + 총영업잉여 + 순생산·수입세",
       "기여도 = 전년 소득 비중(한은 연간 국민계정) × 항목 전년동기비, 분기는 한은 발표분만",

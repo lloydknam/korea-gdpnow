@@ -8,7 +8,7 @@
      - 받은 값은 data/exports_items.csv에 쌓음 → 새 달이 없을 때만 다시 조회
   ❷ API에 아직 없는 달: 관세청 월간 잠정치 보도자료(data/customs_flash.csv의 period=m 줄)
      - 전체 = 수출액, 반도체 = 전년 같은 달 × (1 + 반도체 증감률)
-     - 나머지 품목군 = 전년 같은 달 × (1 + 보도자료 품목 증감률), 없으면 '반도체 외' 증감률
+     - 나머지 품목군 = 전년 같은 달 × (1 + 보도자료 품목 증감률), 없으면 최근 3개월 추세 → 합계에 맞게 비례 조정
      - 확정치가 들어오면 자동 교체
 
 품목군은 HS 기준 근사 → 산업부 MTI 15대 품목 분류와 조금 다름.
@@ -168,18 +168,32 @@ def _flash_rows(flash: pd.DataFrame, piv: pd.DataFrame) -> list[dict]:
         b = piv.loc[base]
         total = float(row["exports_usd_mn"])
         chip_yoy = row.get("chip_yoy_pct")
-        chip = b["chip"] * (1 + float(chip_yoy) / 100) if pd.notna(chip_yoy) else None
         items = parse_items(row.get("items_yoy"))
-        rest_base = b["total"] - (b["chip"] if chip is not None else 0)
-        rest_yoy = ((total - (chip or 0)) / rest_base - 1) if rest_base > 0 else 0.0
-        vals = {"chip": chip}
-        for g, _, _, names in GROUPS[1:]:
+        keys = [g for g, *_ in GROUPS] + ["other"]
+        # 품목군 최근 추세: 확정치 마지막 3개월의 전년동기비 (반도체發 메모리 붐처럼 품목마다 다른 흐름 반영)
+        recent = [mm for mm in piv.index[-3:] if str(pd.Period(mm, "M") - 12) in piv.index]
+        prior = [str(pd.Period(mm, "M") - 12) for mm in recent]
+
+        def trend(g):
+            den = float(piv.loc[prior, g].sum()) if prior else 0.0
+            return float(piv.loc[recent, g].sum()) / den - 1 if den > 0 else 0.0
+
+        vals, fixed = {}, set()
+        if pd.notna(chip_yoy):
+            vals["chip"] = b["chip"] * (1 + float(chip_yoy) / 100)
+            fixed.add("chip")
+        for g, _, _, names in GROUPS:
             yy = next((items[n] for n in names if n in items), None)
-            vals[g] = b[g] * (1 + (yy / 100 if yy is not None else rest_yoy))
-        if vals["chip"] is None:
-            vals["chip"] = b["chip"] * (1 + rest_yoy)
-        vals["other"] = max(0.0, total - sum(vals[g] for g, *_ in GROUPS))
-        out.append({"m": m, **{k: round(v, 1) for k, v in vals.items()}, "total": round(total, 1), "est": True,
+            if g != "chip" and yy is not None:
+                vals[g] = b[g] * (1 + yy / 100)
+                fixed.add(g)
+        flex = [g for g in keys if g not in fixed]
+        pre = {g: max(0.0, b[g] * (1 + trend(g))) for g in flex}
+        room = total - sum(vals.values())
+        sc = room / sum(pre.values()) if sum(pre.values()) > 0 and room > 0 else 1.0
+        for g in flex:   # 보도자료에 없는 품목군: 추세로 나눈 뒤 잠정치 합계에 맞게 비례 조정
+            vals[g] = pre[g] * sc
+        out.append({"m": m, **{g: round(float(v), 1) for g, v in vals.items()}, "total": round(total, 1), "est": True,
                     "src": "관세청 월간 잠정치", "items_from": sorted(n for n in items)})
     return out
 
