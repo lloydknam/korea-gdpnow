@@ -50,6 +50,11 @@ RE_EXP = [
     re.compile(r"수출은전년동(?:기|월)대비([\d.]+)%(증가|감소)한([\d,]+(?:\.\d+)?)억(?:달러|불)"),
 ]
 RE_CHIP = re.compile(r"반도체\(([+\-△▲▼]?)([\d.]+)%\)")
+# 주요 품목 증감률: "승용차(+5.2%)", "석유제품(△3.1%)" → items_yoy 열 '승용차:+5.2|석유제품:-3.1'
+ITEM_NAMES = ["반도체", "자동차", "승용차", "자동차부품", "석유제품", "석유화학", "선박", "철강", "철강제품",
+              "일반기계", "무선통신기기", "무선통신", "컴퓨터주변기기", "컴퓨터", "디스플레이", "정밀기기", "가전",
+              "이차전지", "바이오헬스", "섬유"]
+RE_ITEM = re.compile(r"(" + "|".join(sorted(ITEM_NAMES, key=len, reverse=True)) + r")\(([+\-△▲▼]?)([\d.]+)%\)")
 
 
 # GitHub 서버(미국 Azure)에서 korea.kr 직접 접속이 막힘(연결 시간 초과) → 공개 웹 리더 경유로 재시도
@@ -157,6 +162,13 @@ def parse_numbers(text: str) -> dict:
     c = RE_CHIP.search(s)
     if c:
         res["chip_yoy_pct"] = float(c[2]) * (-1 if c[1] in ("-", "△", "▼") else 1)
+    items = {}
+    for it in RE_ITEM.finditer(s):
+        v = float(it[3]) * (-1 if it[2] in ("-", "△", "▼") else 1)
+        if -95 < v < 1000:
+            items.setdefault(it[1], v)
+    if len(items) >= 2:
+        res["items_yoy"] = "|".join(f"{k}:{v:+g}" for k, v in items.items())
     return res
 
 
@@ -224,6 +236,8 @@ def fetch_release(sess, item) -> dict | None:
                 src = "pdf" if "exports_yoy_pct" not in nums else "meta+pdf"
             for k, v in extra.items():
                 nums.setdefault(k, v)
+            if extra.get("items_yoy") and len(extra["items_yoy"]) > len(nums.get("items_yoy", "")):
+                nums["items_yoy"] = extra["items_yoy"]
             break
     if "exports_yoy_pct" not in nums:
         return None
@@ -233,7 +247,7 @@ def fetch_release(sess, item) -> dict | None:
 def row_line(r: dict) -> str:
     f = lambda v: "" if v is None else (f"{v:g}" if isinstance(v, float) else str(v))
     return ",".join([r["date"], r["ref_month"], r["period"], f(r["exports_yoy_pct"]),
-                     "", "", f(r.get("exports_usd_mn")), f(r.get("chip_yoy_pct"))])
+                     "", "", f(r.get("exports_usd_mn")), f(r.get("chip_yoy_pct")), f(r.get("items_yoy"))])
 
 
 def scrape(days: int = 60, path: Path = CSV, dry_run: bool = False, sess=None) -> list[dict]:
@@ -285,6 +299,10 @@ def scrape(days: int = 60, path: Path = CSV, dry_run: bool = False, sess=None) -
         txt = path.read_text(encoding="utf-8") if path.exists() else ""
         if txt and not txt.endswith("\n"):
             txt += "\n"
+        # 예전 머리글(8열)이면 items_yoy 열 추가 → 9열 줄과 어긋나지 않게
+        txt = re.sub(r"^(release_date,[^\n]*chip_yoy_pct)[ \t]*$", r"\1,items_yoy", txt, flags=re.M)
+        if "release_date," not in txt:
+            txt += "release_date,ref_month,period,exports_yoy_pct,workdays,workdays_prev,exports_usd_mn,chip_yoy_pct,items_yoy\n"
         txt += "\n".join(row_line(r) for r in new) + "\n"
         path.write_text(txt, encoding="utf-8")
     print(f"관세청 속보: 검색 {len(items)}건, 신규 {len(new)}건{' (dry-run)' if dry_run else ''}")

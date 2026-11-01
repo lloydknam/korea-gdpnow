@@ -58,6 +58,7 @@ jobs:
       - name: Run nowcast
         env:
           ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}   # 공공데이터포털(품목별 수출). 없으면 그 부분만 건너뜀
         run: python -m nowcast.run
 
       # 사이트를 먼저 배포 → 아래 커밋이 실패해도 페이지는 갱신됨

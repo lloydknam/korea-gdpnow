@@ -121,7 +121,7 @@ def test():
     # 9월 d20·m은 이미 있음 → 10월 d10만 추가, 반도체는 PDF에서
     assert [(r["ref_month"], r["period"]) for r in new] == [("2026-10", "d10")], new
     after = tmp.read_text(encoding="utf-8")
-    assert after.startswith(before) and after.endswith("2026-10-12,2026-10,d10,102,,,26100,170.9\n"), after[-80:]
+    assert after.startswith(before.replace("chip_yoy_pct\n", "chip_yoy_pct,items_yoy\n")) and after.endswith("2026-10-12,2026-10,d10,102,,,26100,170.9,반도체:+170.9|석유제품:+45.6|승용차:+82.7\n"), after[-80:]
     # 재실행 → 중복 없음
     assert cs.scrape(path=tmp, sess=FakeSession()) == []
 
