@@ -269,8 +269,8 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
   </section>
 
   <section id="xi-sec" hidden>
-    <h2 id="xi-h">품목별 수출액 (연간 누적)</h2>
-    <p class="sub">억달러, 1월부터 누적 · 점선 = 전년 같은 기간 누적 · 빗금 = 관세청 잠정치 기반 추정</p>
+    <h2 id="xi-h">품목별 수출액</h2>
+    <p class="sub">월별 수출액(억달러) · 진한 막대 = 관세청 통관 확정 실적 · 빗금 = 잠정치 기반 추정 · 가로선 = 전년 같은 달</p>
     <p class="lead" id="xi-lead"></p>
     <div class="legend" id="xi-legend"></div>
     <div class="chart" id="c-xi"></div>
@@ -760,7 +760,7 @@ function renderExports() {
   const cols = G.map((g, j) => CM[g.k] || spare[j % spare.length]);
   const cur = X0.rows.filter(r => r.m.startsWith(String(Y0))), prv = X0.rows.filter(r => r.m.startsWith(String(Y0 - 1)));
   const n = cur.length, eok = v => v / 100;
-  $("#xi-h").textContent = `${Y0}년 품목별 수출액 (연간 누적)`;
+  $("#xi-h").textContent = `${Y0}년 품목별 월 수출액`;
   // 누적
   const cum = {}; G.forEach(g => { let a = 0; cum[g.k] = cur.map(r => (a += eok(r[g.k] || 0))); });
   let pa = 0; const pcum = prv.map(r => (pa += eok(r.total)));
@@ -772,13 +772,13 @@ function renderExports() {
     (pcum.length === 12 ? ` · ${Y0 - 1}년 연간 ${Math.round(pcum[11]).toLocaleString("ko-KR")}억달러` : "")));
   const lg = $("#xi-legend"); lg.replaceChildren();
   G.slice().forEach((g, j) => { const sp = h("span"); const k = h("i", "key"); k.style.background = css(cols[j]); sp.append(k, g.label); lg.appendChild(sp); });
-  { const sp = h("span"), k = h("i", "key dash"); k.style.borderColor = css("--ink-2"); sp.append(k, `${Y0 - 1}년 누적`); lg.appendChild(sp); }
-  // 그래프
+  { const sp = h("span"), k = h("i", "key line"); k.style.borderColor = css("--ink"); sp.append(k, `${Y0 - 1}년 같은 달`); lg.appendChild(sp); }
+  // 그래프: 월별 누적 막대(품목군), 가로 눈금 = 전년 같은 달 합계
   const box = $("#c-xi"); box.replaceChildren();
-  const W = box.clientWidth || 340, H = 230, m = { t: 12, r: 52, b: 22, l: 40 };
-  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${Y0}년 품목별 수출액 누적` }, box);
-  const ticks = niceTicks(0, Math.max(tot[n - 1], ...(pcum.length ? pcum : [0])), 4);
-  const X = i => m.l + (W - m.l - m.r) * i / 12;              // i = 월말(0 = 1월 초)
+  const W = box.clientWidth || 340, H = 240, m = { t: 16, r: 8, b: 22, l: 40 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${Y0}년 품목별 월 수출액` }, box);
+  const mt = cur.map(r => eok(r.total)), pm = prv.map(r => eok(r.total));
+  const ticks = niceTicks(0, Math.max(...mt, ...(pm.length ? pm : [0])), 4);
   const Y = v => m.t + (H - m.t - m.b) * (1 - v / ticks[ticks.length - 1]);
   grid(svg, ticks, Y, m.l, W - m.r);
   const defs = el("defs", {}, svg);
@@ -787,37 +787,35 @@ function renderExports() {
     el("rect", { width: 5, height: 5, fill: css(cols[j]), opacity: .3 }, pt);
     el("line", { x1: 0, y1: 0, x2: 0, y2: 5, stroke: css(cols[j]), "stroke-width": 2.4 }, pt);
   });
-  const ia = cur.findIndex(r => r.est), na = ia < 0 ? n : ia;   // 확정치 달 수
-  let base = cur.map(() => 0);
-  G.forEach((g, j) => {
-    const top = cur.map((_, i) => base[i] + cum[g.k][i]);
-    const area = (a, b, lo, hi) => {      // 월 a..b 구간(a=0이면 1월 초 0에서 시작)
-      const xs = []; for (let i = a; i <= b; i++) xs.push(i);
-      const up = xs.map(i => `${X(i)},${Y(i === 0 ? 0 : hi[i - 1])}`), dn = xs.slice().reverse().map(i => `${X(i)},${Y(i === 0 ? 0 : lo[i - 1])}`);
-      return `M${up.join("L")}L${dn.join("L")}Z`;
+  const band = (W - m.l - m.r) / 12, bw = Math.min(28, band * 0.68), tip = tipFor(box);
+  for (let mi = 0; mi < 12; mi++) {
+    const x = m.l + band * mi + (band - bw) / 2, r = cur[mi], g = el("g", r ? { tabindex: 0 } : {}, svg);
+    if (r) {
+      let acc = 0;
+      G.forEach((gg, j) => {
+        const v = eok(r[gg.k] || 0); if (v <= 0) return;
+        el("rect", { x, width: bw, y: Y(acc + v), height: Math.max(0.5, Y(acc) - Y(acc + v)), fill: r.est ? `url(#xi-h-${gg.k})` : css(cols[j]), stroke: css("--bg"), "stroke-width": .6 }, g);
+        acc += v;
+      });
+      if (r.est) txt(svg, x + bw / 2, Y(eok(r.total)) - 4, "추정", { "text-anchor": "middle", "font-size": 10 });
+    }
+    if (pm[mi] != null) el("line", { x1: x - 2, x2: x + bw + 2, y1: Y(pm[mi]), y2: Y(pm[mi]), stroke: css("--ink"), "stroke-width": 2, "stroke-linecap": "round", opacity: r ? 1 : .45 }, g);
+    txt(svg, x + bw / 2, H - 6, band < 26 && (mi + 1) % 3 !== 1 ? "" : `${mi + 1}월`, { "text-anchor": "middle" });
+    if (!r) continue;
+    el("rect", { x: m.l + band * mi, y: 0, width: band, height: H, fill: "transparent" }, g);
+    const show = () => {
+      const k = box.clientWidth / W, tv = eok(r.total), pv = pm[mi];
+      const ls = [{ v: `${Y0}년 ${mi + 1}월${r.est ? " (잠정치 기반 추정)" : " (확정)"}` },
+        { v: Math.round(tv).toLocaleString("ko-KR") + "억달러" + (pv ? ` · 전년비 ${fmt((tv / pv - 1) * 100, 1)}%` : ""), strong: true }];
+      G.slice().reverse().forEach(gg => {
+        const j = G.indexOf(gg), v = eok(r[gg.k] || 0), p0 = prv[mi] ? eok(prv[mi][gg.k] || 0) : null;
+        ls.push({ v: `${Math.round(v).toLocaleString("ko-KR")}${p0 ? ` (${fmt((v / p0 - 1) * 100, 0)}%)` : ""}`, k: gg.label, key: css(cols[j]) });
+      });
+      tip.show(ls, (x + bw / 2) * k, (m.t + 20) * k);
     };
-    if (na > 0) el("path", { d: area(0, na, base, top), fill: css(cols[j]), stroke: css("--bg"), "stroke-width": .6 }, svg);
-    if (na < n) el("path", { d: area(na, n, base, top), fill: `url(#xi-h-${g.k})`, stroke: css("--bg"), "stroke-width": .6 }, svg);
-    base = top;
-  });
-  if (pcum.length) el("path", { d: `M${X(0)},${Y(0)}` + pcum.map((v, i) => `L${X(i + 1)},${Y(v)}`).join(""), fill: "none", stroke: css("--ink-2"), "stroke-width": 1.8, "stroke-dasharray": "5 4" }, svg);
-  el("circle", { cx: X(n), cy: Y(tot[n - 1]), r: 4, fill: css("--ink"), stroke: css("--bg"), "stroke-width": 2 }, svg);
-  txt(svg, X(n) + 6, Y(tot[n - 1]) + 4, Math.round(tot[n - 1]).toLocaleString("ko-KR"), { class: "lbl" });
-  if (pcum.length === 12) txt(svg, X(12) + 4, Y(pcum[11]) + 4, Math.round(pcum[11]).toLocaleString("ko-KR"), { "font-size": 10.5 });
-  [1, 4, 7, 10, 12].forEach(mm => txt(svg, X(mm), H - 6, `${mm}월`, { "text-anchor": "middle" }));
-  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), opacity: 0 }, svg), tip = tipFor(box);
-  const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
-  hit.addEventListener("pointermove", e => {
-    const { sx, k } = svgPt(svg, W, e);
-    const i = Math.max(1, Math.min(n, Math.round((sx - m.l) / (W - m.l - m.r) * 12))), r = cur[i - 1];
-    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", 1);
-    const ls = [{ v: `1~${i}월 누적${r.est ? " (잠정치 추정 포함)" : ""}`, cls: "k" }, { v: Math.round(tot[i - 1]).toLocaleString("ko-KR") + "억달러", strong: true }];
-    G.slice().reverse().forEach(g => { const j = G.indexOf(g); ls.push({ v: Math.round(cum[g.k][i - 1]).toLocaleString("ko-KR"), k: g.label, key: css(cols[j]) }); });
-    if (pcum[i - 1]) ls.push({ v: `${Math.round(pcum[i - 1]).toLocaleString("ko-KR")} (${fmt((tot[i - 1] / pcum[i - 1] - 1) * 100, 1)}%)`, k: `${Y0 - 1}년 같은 기간`, cls: "k" });
-    ls.push({ v: `${i}월 한 달 ${Math.round(eok(r.total)).toLocaleString("ko-KR")}억달러`, cls: "k" });
-    tip.show(ls, X(i) * k, (m.t + 30) * k);
-  });
-  hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
+    g.addEventListener("pointerenter", show); g.addEventListener("focus", show);
+    g.addEventListener("pointerleave", tip.hide); g.addEventListener("blur", tip.hide);
+  }
   // 표: 누적 금액·전년 대비·비중
   const more = $("#xi-more"); more.replaceChildren();
   const pY = G.map(g => prv.slice(0, lastM).reduce((s2, r) => s2 + eok(r[g.k] || 0), 0));
@@ -828,7 +826,7 @@ function renderExports() {
   });
   rowsT.push(["합계", Math.round(tot[n - 1]).toLocaleString("ko-KR"), pSame ? fmt((tot[n - 1] / pSame - 1) * 100, 1) + "%" : "–", "100%",
     pSame ? fmt((tot[n - 1] / pSame - 1) * 100, 1) : "–"]);
-  const tb = smallTable(["품목", `1~${lastM}월`, "전년비", "비중", "기여%p"], rowsT);
+  const tb = smallTable(["품목", `1~${lastM}월 누적`, "전년비", "비중", "기여%p"], rowsT);
   tb.lastChild.classList.add("sum"); more.appendChild(tb);
   const est = cur.filter(r => r.est);
   const nt = h("p", "note", `금액 억달러 · IT기기 = 무선통신·컴퓨터·디스플레이 · HS 코드 기준 품목군(산업부 15대 품목 분류와 조금 다름) · 출처: ${X0.src}` +
