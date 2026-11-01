@@ -849,8 +849,8 @@ function renderExports() {
   });
   rowsT.unshift(["합계", Math.round(tot[n - 1]).toLocaleString("ko-KR"), pSame ? fmt((tot[n - 1] / pSame - 1) * 100, 1) + "%" : "–", "100%",
     pSame ? fmt((tot[n - 1] / pSame - 1) * 100, 1) : "–"]);
-  // 합계 + 상위 7개만 보이고 나머지는 눌러서 펼침
-  const SHOWN = 7, tb = smallTable(["품목", `1~${lastM}월 누적`, "전년비", "비중", "기여%p"], rowsT);
+  // 합계 + 상위 4개만 보이고 나머지는 눌러서 펼침
+  const SHOWN = 4, tb = smallTable(["품목", `1~${lastM}월 누적`, "전년비", "비중", "기여%p"], rowsT);
   const trs = [...tb.querySelectorAll("tr")].slice(1);
   trs[0].classList.add("tot");
   const hid = trs.slice(1 + SHOWN);
