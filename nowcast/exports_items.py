@@ -139,7 +139,7 @@ def update_cache(key: str | None, path: Path, now: datetime, first_year: int, se
         return cache
     # 같은 날 이미 헛걸음했으면 다시 안 부름(하루 1번 → 호출 수 절약)
     tried = path.with_name("exports_items_try.txt")
-    stamp = f"{now:%Y-%m-%d} {missing[0]}"
+    stamp = f"{now:%Y-%m-%d} {missing[0]} {len(missing)} {len(need)}"   # 품목군이 바뀌면 같은 날이라도 다시
     if tried.exists() and tried.read_text().strip() == stamp:
         return cache
     start = min(missing[0], want_last - 1) if have else first
