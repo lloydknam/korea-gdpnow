@@ -27,13 +27,21 @@ URL = "https://apis.data.go.kr/1220000/Itemtrade/getItemtradeList"
 GROUPS = [  # (키, 이름, HS 코드('-'는 빼기), 속보 품목명 후보) — 산업부 15대 품목을 HS로 근사
     ("chip", "반도체", ["8541", "8542"], ["반도체"]),
     ("auto", "자동차·부품", ["8703", "8704", "8708"], ["자동차", "승용차"]),
-    ("mach", "일반기계", ["84", "-8471", "-8473"], ["일반기계"]),
+    ("mach", "일반기계", ["84", "-8471", "-8473", "-8415", "-8418", "-8450"], ["일반기계"]),
     ("chem", "석유화학", ["29", "39"], ["석유화학"]),
     ("petro", "석유제품", ["2710"], ["석유제품"]),
     ("steel", "철강", ["72", "73"], ["철강", "철강제품"]),
     ("ship", "선박", ["89"], ["선박"]),
     ("ict", "IT기기", ["8517", "8471", "8473", "8524"], ["무선통신기기", "무선통신", "컴퓨터"]),
     ("bio", "바이오·화장품", ["30", "3304"], ["바이오헬스"]),
+    ("batt", "이차전지", ["8507"], ["이차전지"]),
+    ("power", "전력기기·전선", ["8501", "8502", "8504", "8535", "8536", "8537", "8544"], []),
+    ("appl", "가전", ["8415", "8418", "8450", "8516", "8528"], ["가전"]),
+    ("prec", "정밀기기", ["90"], ["정밀기기"]),
+    ("nonfe", "비철금속", ["74", "75", "76", "78", "79", "80", "81"], []),
+    ("gold", "귀금속", ["71"], []),
+    ("tex", "섬유", [f"{i}" for i in range(50, 64)], ["섬유"]),
+    ("food", "농수산식품", [f"{i:02d}" for i in range(1, 25)], []),
 ]
 OTHER = ("other", "기타")
 CHAPTERS = [f"{i:02d}" for i in range(1, 98) if i != 77]   # HS 2단위(77류는 없음)
@@ -104,6 +112,7 @@ def fetch(key: str, start: pd.Period, end: pd.Period, sess=None) -> pd.DataFrame
         for hs in CHAPTERS:
             for m, v in q(hs).items():
                 acc[(m, "total")] = acc.get((m, "total"), 0.0) + v
+                acc[(m, f"ch{hs}")] = v
     df = pd.DataFrame([{"month": m, "group": g, "usd_mn": round(v / 1e6, 1)} for (m, g), v in acc.items()])
     if df.empty:
         return df
@@ -118,7 +127,7 @@ def update_cache(key: str | None, path: Path, now: datetime, first_year: int, se
         return cache
     cur = pd.Period(now.strftime("%Y-%m"), "M")
     want_last = cur - 1
-    need = {"total"} | {g for g, *_ in GROUPS}
+    need = {"total", "ch85"} | {g for g, *_ in GROUPS}
     by_m = cache.groupby("month")["group"].apply(set) if not cache.empty else pd.Series(dtype=object)
     have = {m for m, gs in by_m.items() if need <= gs}
     first = pd.Period(f"{first_year}-01", "M")
@@ -198,6 +207,20 @@ def _flash_rows(flash: pd.DataFrame, piv: pd.DataFrame) -> list[dict]:
     return out
 
 
+def _log_other(piv: pd.DataFrame, year: int) -> None:
+    """기타에 남은 몫이 큰 HS 류(품목군에 한 코드도 안 쓰인 류)를 로그로 → 다음 분리 후보."""
+    used = {c.lstrip("-")[:2] for _, _, codes, _ in GROUPS for c in codes}
+    ytd = piv[piv.index.str.startswith(str(year))]
+    if ytd.empty or "total" not in ytd:
+        return
+    tot = float(ytd["total"].sum())
+    cand = sorted(((float(ytd[c].sum()), c[2:]) for c in ytd.columns if len(c) == 4 and c.startswith("ch") and c[2:].isdigit() and c[2:] not in used),
+                  reverse=True)[:8]
+    if cand and tot > 0:
+        print("::notice::기타 중 큰 HS 류(올해 누적 비중): " + ", ".join(f"{c}류 {v / tot * 100:.1f}%" for v, c in cand)
+              + f" · 기타 합 {float(ytd['other'].sum()) / tot * 100:.1f}%")
+
+
 def parse_items(s) -> dict[str, float]:
     """'승용차:+5.2|선박:-3.0' → {'승용차': 5.2, '선박': -3.0}"""
     out = {}
@@ -226,6 +249,7 @@ def section(key: str | None, data_dir: Path, now: datetime, flash: pd.DataFrame 
             piv[g] = 0.0
     piv = piv.fillna(0.0)
     piv["other"] = (piv["total"] - piv[[g for g, *_ in GROUPS]].sum(axis=1)).clip(lower=0)
+    _log_other(piv, year)
     rows = [{"m": m, **{k: round(float(piv.loc[m, k]), 1) for k in [g for g, *_ in GROUPS] + ["other", "total"]},
              "est": False} for m in piv.index]
     rows += _flash_rows(flash, piv)

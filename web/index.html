@@ -21,7 +21,7 @@
   --main:#135f8c; --band:#a9d3ea; --band2:#dcd8cf; --head:#0f4c75; --badge:#2b8fcc;
   --cmp1:#4a5057; --cmp2:#9b9a95; --neg:#b9533d; --chip:#ece8e0;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
-  --s6:#8a63d2; --s7:#9c6b3f; --s8:#8a9a2b; --s9:#22a6b8;
+  --s6:#8a63d2; --s7:#9c6b3f; --s8:#8a9a2b; --s9:#22a6b8; --s10:#3f51b5; --s11:#c2185b;
 }
 @media (prefers-color-scheme:dark){
   :root:where(:not([data-theme="light"])){
@@ -32,7 +32,7 @@
     --main:#5aa9db; --band:#22506d; --band2:#33373c; --head:#8cc4ea; --badge:#2b8fcc;
     --cmp1:#c3c7cc; --cmp2:#7e8389; --neg:#e07a63; --chip:#23272b;
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
-    --s6:#9a78e6; --s7:#b78452; --s8:#a3b23a; --s9:#2ab8cb;
+    --s6:#9a78e6; --s7:#b78452; --s8:#a3b23a; --s9:#2ab8cb; --s10:#7986cb; --s11:#e05a8a;
   }
 }
 :root[data-theme="dark"]{
@@ -43,7 +43,7 @@
   --main:#5aa9db; --band:#22506d; --band2:#33373c; --head:#8cc4ea; --badge:#2b8fcc;
   --cmp1:#c3c7cc; --cmp2:#7e8389; --neg:#e07a63; --chip:#23272b;
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
-  --s6:#9a78e6; --s7:#b78452; --s8:#a3b23a; --s9:#2ab8cb;
+  --s6:#9a78e6; --s7:#b78452; --s8:#a3b23a; --s9:#2ab8cb; --s10:#7986cb; --s11:#e05a8a;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink)}
@@ -750,19 +750,37 @@ function renderChip() {
   hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
 }
 
+// HS 코드 목록 → "84류−8471·8473", 연속 류는 "50~63류"
+function hsTxt(codes) {
+  const out = [], two = codes.filter(c => /^\d\d$/.test(c)).map(Number), oth = codes.filter(c => !/^\d\d$/.test(c));
+  for (let i = 0; i < two.length; i++) {
+    let j = i; while (j + 1 < two.length && two[j + 1] === two[j] + 1) j++;
+    const f = n => String(n).padStart(2, "0");
+    out.push(j > i + 1 ? `${f(two[i])}~${f(two[j])}류` : two.slice(i, j + 1).map(n => f(n) + "류").join("·")); i = j;
+  }
+  const plus = oth.filter(c => c[0] !== "-"), minus = oth.filter(c => c[0] === "-").map(c => c.slice(1));
+  return [...out, ...plus].join("·") + (minus.length ? "(−" + minus.join("·") + ")" : "");
+}
+
 // ================================================================ 품목별 수출액: 연간 누적 영역
 function renderExports() {
   const X0 = DATA.exports, sec = $("#xi-sec");
   sec.hidden = !X0 || !X0.rows || !X0.rows.length; if (sec.hidden) return;
-  const Y0 = X0.year, G = X0.groups;
-  const CM = { chip: "--s1", auto: "--s2", mach: "--s3", chem: "--s4", petro: "--s6", steel: "--s5", ship: "--s7", ict: "--s9", bio: "--s8", other: "--cmp2" };
-  const spare = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7", "--s8", "--s9"];
-  const cols = G.map((g, j) => CM[g.k] || spare[j % spare.length]);
-  const cur = X0.rows.filter(r => r.m.startsWith(String(Y0))), prv = X0.rows.filter(r => r.m.startsWith(String(Y0 - 1)));
+  const Y0 = X0.year, GA = X0.groups;
+  const cur0 = X0.rows.filter(r => r.m.startsWith(String(Y0))), prv0 = X0.rows.filter(r => r.m.startsWith(String(Y0 - 1)));
+  // 올해 누적 큰 순 → 그래프엔 상위 11개 색, 나머지 품목군은 '기타'에 합쳐 표시(표엔 전부)
+  const ytd = k => cur0.reduce((a, r) => a + (r[k] || 0), 0);
+  const named = GA.filter(g => g.k !== "other").sort((a, b) => ytd(b.k) - ytd(a.k));
+  const TOP = 11, rest = named.slice(TOP);
+  const mk = r => ({ ...r, _oth: (r.other || 0) + rest.reduce((a, g) => a + (r[g.k] || 0), 0) });
+  const cur = cur0.map(mk), prv = prv0.map(mk);
+  const G = [...named.slice(0, TOP), { k: "_oth", label: "기타" }];
+  const PAL = ["--s1", "--s9", "--s2", "--s6", "--s3", "--s4", "--s7", "--s5", "--s8", "--s10", "--s11"];
+  const cols = G.map((g, j) => g.k === "_oth" ? "--cmp2" : PAL[j % PAL.length]);
   const n = cur.length, eok = v => v / 100;
   $("#xi-h").textContent = `${Y0}년 품목별 월 수출액`;
   // 누적
-  const cum = {}; G.forEach(g => { let a = 0; cum[g.k] = cur.map(r => (a += eok(r[g.k] || 0))); });
+  const cum = {}; [...G, ...GA].forEach(g => { let a = 0; cum[g.k] = cur.map(r => (a += eok(r[g.k] || 0))); });
   let pa = 0; const pcum = prv.map(r => (pa += eok(r.total)));
   const tot = cur.map((_, i) => G.reduce((s2, g) => s2 + cum[g.k][i], 0));
   const lastM = +cur[n - 1].m.slice(5), pSame = pcum[lastM - 1];
@@ -818,10 +836,11 @@ function renderExports() {
   }
   // 표: 누적 금액·전년 대비·비중
   const more = $("#xi-more"); more.replaceChildren();
-  const pY = G.map(g => prv.slice(0, lastM).reduce((s2, r) => s2 + eok(r[g.k] || 0), 0));
-  const rowsT = G.map((g, j) => {
+  const TG = [...named, GA.find(g => g.k === "other") || { k: "other", label: "기타" }];
+  const pY = TG.map(g => prv.slice(0, lastM).reduce((s2, r) => s2 + eok(r[g.k] || 0), 0));
+  const rowsT = TG.map((g, j) => {
     const v = cum[g.k][n - 1];
-    return [g.label, Math.round(v).toLocaleString("ko-KR"), pY[j] ? fmt((v / pY[j] - 1) * 100, 1) + "%" : "–", (v / tot[n - 1] * 100).toFixed(1) + "%",
+    return [g.label + (rest.includes(g) || g.k === "other" ? " *" : ""), Math.round(v).toLocaleString("ko-KR"), pY[j] ? fmt((v / pY[j] - 1) * 100, 1) + "%" : "–", (v / tot[n - 1] * 100).toFixed(1) + "%",
       pY[j] && pSame ? fmt((v - pY[j]) / pSame * 100, 1) : "–"];
   });
   rowsT.push(["합계", Math.round(tot[n - 1]).toLocaleString("ko-KR"), pSame ? fmt((tot[n - 1] / pSame - 1) * 100, 1) + "%" : "–", "100%",
@@ -829,7 +848,7 @@ function renderExports() {
   const tb = smallTable(["품목", `1~${lastM}월 누적`, "전년비", "비중", "기여%p"], rowsT);
   tb.lastChild.classList.add("sum"); more.appendChild(tb);
   const est = cur.filter(r => r.est);
-  const nt = h("p", "note", `금액 억달러 · IT기기 = 무선통신·컴퓨터·디스플레이 · HS 코드 기준 품목군(산업부 15대 품목 분류와 조금 다름) · 출처: ${X0.src}` +
+  const nt = h("p", "note", `* 그래프에선 '기타'로 합쳐 표시 · 금액 억달러 · IT기기 = 무선통신·컴퓨터·디스플레이 · HS 코드 기준 품목군(산업부 15대 품목 분류와 조금 다름) · 출처: ${X0.src}` +
     (est.length ? ` · ${est.map(r => +r.m.slice(5) + "월").join("·")} = 잠정치 합계·반도체 증감률${est.some(r => r.items_from && r.items_from.length > 1) ? "·품목 증감률" : ""} + 품목군 최근 추세로 추정, 확정치(매월 15일경) 들어오면 교체` : ""));
   more.appendChild(nt);
 }
@@ -1202,7 +1221,7 @@ function renderMethod() {
       "통계표 번호는 고정하지 않고 실행 때 이름으로 찾음 → 표 번호가 바뀌어도 자동 추적"]],
     DATA.exports && ["부가: 품목별 수출액", [
       "관세청 품목별 수출입실적(공공데이터포털 API, 매월 15일경 전월 확정치) → 품목군 = HS 코드 묶음, 전체 = HS 2단위 류 합",
-      DATA.exports.groups.filter(g => DATA.exports.hs[g.k]).map(g => `${g.label} ${DATA.exports.hs[g.k].map(c => (c[0] === "-" ? "−" + c.slice(1) : c) + (c.replace("-", "").length === 2 ? "류" : "")).join("·")}`).join(" / ") + " / 기타 = 전체 − 합",
+      DATA.exports.groups.filter(g => DATA.exports.hs[g.k]).map(g => `${g.label} ${hsTxt(DATA.exports.hs[g.k])}`).join(" / ") + " / 기타 = 전체 − 합",
       "확정치 없는 달: 관세청 월간 잠정치 보도자료 → 전체 금액, 반도체·주요 품목 증감률 × 전년 같은 달 · 증감률 없는 품목군은 최근 3개월 추세로 나눈 뒤 잠정치 합계에 맞게 비례 조정"]],
     DATA.dist && ["부가: 분배 (소득 측)", [
       "경상 GDP = 피용자보수 + 총영업잉여 + 순생산·수입세",
