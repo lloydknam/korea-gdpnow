@@ -212,7 +212,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 
   <section>
     <h2 id="evo-h">성장률 추정치 변화</h2>
-    <p class="sub">새 지표가 나올 때마다 갱신된 연간 추정치(전년비, %) · 음영은 그 시점의 오차범위</p>
+    <p class="sub">새 지표가 나올 때마다 갱신된 연간 추정치(전년비, %) · 세로축은 변동폭에 맞춰 확대 · 음영은 오차범위(일부)</p>
     <div id="evo"></div>
   </section>
 
@@ -1125,25 +1125,29 @@ function renderEvo() {
   panels.forEach(P => {
     const wrap = h("div", "evo-p"), last = pts[pts.length - 1];
     const head = h("h4", "", P.label);
-    head.appendChild(h("span", "", `현재 ${last[P.k].toFixed(1)}% · 첫 추정 ${pts[0][P.k].toFixed(1)}% · ${A.year - 1}년 실적 ${P.prev != null ? P.prev.toFixed(1) + "%" : "–"}`));
+    head.appendChild(h("span", "", `현재 ${last[P.k].toFixed(2)}% · 첫 추정 ${pts[0][P.k].toFixed(2)}% · ${A.year - 1}년 실적 ${P.prev != null ? P.prev.toFixed(1) + "%" : "–"}`));
     wrap.appendChild(head);
     const cb = h("div", "chart"); wrap.appendChild(cb); box.appendChild(wrap);
-    const W = cb.clientWidth || 340, H = 150, m = { t: 12, r: 44, b: 22, l: 30 };
+    const W = cb.clientWidth || 340, H = 150, m = { t: 12, r: 48, b: 22, l: 38 };
     const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${A.year}년 ${P.label} 추정치 변화` }, cb);
-    const vals = pts.flatMap(p => [p[P.k] - p[P.sd], p[P.k] + p[P.sd]]);
-    const ticks = niceTicks(Math.min(...vals), Math.max(...vals), 3);
+    // 세로축: 오차범위 대신 추정치 자체의 변동폭에 맞춤(최소 0.4%p 폭) → 작은 변화도 보이게. 음영은 영역 밖 잘림
+    const vs = pts.map(p => p[P.k]), vlo = Math.min(...vs), vhi = Math.max(...vs);
+    const half = Math.max(0.2, (vhi - vlo) * 0.65), mid = (vlo + vhi) / 2;
+    const ticks = niceTicks(mid - half, mid + half, 4), stp = ticks[1] - ticks[0];
     const X = t => m.l + (W - m.l - m.r) * ((+t - t0) / span);
     const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks[ticks.length - 1] - ticks[0]));
-    grid(svg, ticks, Y, m.l, W - m.r, ticks[1] - ticks[0] < 1 ? 1 : 0);
+    grid(svg, ticks, Y, m.l, W - m.r, Math.abs(stp * 10 - Math.round(stp * 10)) > 1e-6 ? 2 : stp < 1 ? 1 : 0);
+    const cid = "evoclip-" + P.k;
+    el("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b }, el("clipPath", { id: cid }, el("defs", {}, svg)));
     // 계단: 다음 갱신 전까지 값 유지, 마지막 값은 현재 시각까지 연장
     const seg = pts.map((p, i) => ({ x0: X(p.t), x1: X(i < pts.length - 1 ? pts[i + 1].t : tEnd), v: p[P.k], sd: p[P.sd] }));
     const up = [], dn = [];
     seg.forEach(s => { up.push(`${s.x0},${Y(s.v + s.sd)}`, `${s.x1},${Y(s.v + s.sd)}`); dn.unshift(`${s.x1},${Y(s.v - s.sd)}`, `${s.x0},${Y(s.v - s.sd)}`); });
-    el("path", { d: `M${up.join("L")}L${dn.join("L")}Z`, fill: P.band, opacity: .85 }, svg);
+    el("path", { d: `M${up.join("L")}L${dn.join("L")}Z`, fill: P.band, opacity: .55, "clip-path": `url(#${cid})` }, svg);
     const d = seg.map((s, i) => `${i ? "V" : "M" + s.x0 + ","}${Y(s.v)}H${s.x1}`).join("");
     el("path", { d, fill: "none", stroke: P.color, "stroke-width": 2.5, "stroke-linejoin": "round", ...(P.dash ? { "stroke-dasharray": P.dash } : {}) }, svg);
     pts.forEach((p, i) => el("circle", { cx: X(p.t), cy: Y(p[P.k]), r: i === pts.length - 1 ? 4.5 : 3, fill: P.color, stroke: css("--bg"), "stroke-width": 1.5 }, svg));
-    txt(svg, X(tEnd) + 6, Y(last[P.k]) + 4, last[P.k].toFixed(1), { class: "lbl" });
+    txt(svg, X(tEnd) + 6, Y(last[P.k]) + 4, last[P.k].toFixed(2), { class: "lbl" });
     // x축: 기간이 길면 월 눈금, 짧으면 시작·끝 날짜
     const fd = t => `${t.getMonth() + 1}/${t.getDate()}`;
     if (span > 40 * 864e5) {
@@ -1185,8 +1189,8 @@ function renderEvo() {
     const md = new Date(p.t.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     tr.appendChild(h("td", "", `${md.getMonth() + 1}/${md.getDate()}`));
     ["real", "nom"].forEach(k => {
-      const td = h("td", "", p[k].toFixed(1));
-      if (prevP) { const dv = p[k] - prevP[k]; td.appendChild(h("span", "d", Math.abs(dv) < 0.05 ? "–" : (dv > 0 ? "▲" : "▼") + Math.abs(dv).toFixed(1))); }
+      const td = h("td", "", p[k].toFixed(2));
+      if (prevP) { const dv = p[k] - prevP[k]; td.appendChild(h("span", "d", Math.abs(dv) < 0.005 ? "–" : (dv > 0 ? "▲" : "▼") + Math.abs(dv).toFixed(2))); }
       tr.appendChild(td);
     });
     tr.appendChild(h("td", "", p.new.length ? p.new.join(", ") : (prevP ? "모형·보간 변화" : "첫 추정")));
