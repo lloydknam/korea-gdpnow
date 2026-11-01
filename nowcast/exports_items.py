@@ -24,12 +24,16 @@ import pandas as pd
 import requests
 
 URL = "https://apis.data.go.kr/1220000/Itemtrade/getItemtradeList"
-GROUPS = [  # (키, 이름, HS 코드, 속보 품목명 후보)
+GROUPS = [  # (키, 이름, HS 코드('-'는 빼기), 속보 품목명 후보) — 산업부 15대 품목을 HS로 근사
     ("chip", "반도체", ["8541", "8542"], ["반도체"]),
     ("auto", "자동차·부품", ["8703", "8704", "8708"], ["자동차", "승용차"]),
-    ("petro", "석유제품·석유화학", ["2710", "29", "39"], ["석유제품", "석유화학"]),
-    ("ship", "선박", ["89"], ["선박"]),
+    ("mach", "일반기계", ["84", "-8471", "-8473"], ["일반기계"]),
+    ("chem", "석유화학", ["29", "39"], ["석유화학"]),
+    ("petro", "석유제품", ["2710"], ["석유제품"]),
     ("steel", "철강", ["72", "73"], ["철강", "철강제품"]),
+    ("ship", "선박", ["89"], ["선박"]),
+    ("ict", "IT기기", ["8517", "8471", "8473", "8524"], ["무선통신기기", "무선통신", "컴퓨터"]),
+    ("bio", "바이오·화장품", ["30", "3304"], ["바이오헬스"]),
 ]
 OTHER = ("other", "기타")
 CHAPTERS = [f"{i:02d}" for i in range(1, 98) if i != 77]   # HS 2단위(77류는 없음)
@@ -84,15 +88,22 @@ def fetch(key: str, start: pd.Period, end: pd.Period, sess=None) -> pd.DataFrame
     acc: dict[tuple[str, str], float] = {}
     for a, b in _windows(start, end):
         s, e = a.strftime("%Y%m"), b.strftime("%Y%m")
-        for g, _, codes, _ in GROUPS:
-            for hs in codes:
-                for m, v in _query(sess, key, s, e, hs).items():
-                    acc[(m, g)] = acc.get((m, g), 0.0) + v
+        memo: dict[str, dict] = {}
+
+        def q(hs):   # 같은 코드(예: 8471은 기계에서 빼고 IT에 더함)는 한 번만 조회
+            if hs not in memo:
+                memo[hs] = _query(sess, key, s, e, hs)
                 time.sleep(PAUSE)
+            return memo[hs]
+
+        for g, _, codes, _ in GROUPS:
+            for code in codes:
+                sign, hs = (-1, code[1:]) if code.startswith("-") else (1, code)
+                for m, v in q(hs).items():
+                    acc[(m, g)] = acc.get((m, g), 0.0) + sign * v
         for hs in CHAPTERS:
-            for m, v in _query(sess, key, s, e, hs).items():
+            for m, v in q(hs).items():
                 acc[(m, "total")] = acc.get((m, "total"), 0.0) + v
-            time.sleep(PAUSE)
     df = pd.DataFrame([{"month": m, "group": g, "usd_mn": round(v / 1e6, 1)} for (m, g), v in acc.items()])
     if df.empty:
         return df
@@ -107,7 +118,9 @@ def update_cache(key: str | None, path: Path, now: datetime, first_year: int, se
         return cache
     cur = pd.Period(now.strftime("%Y-%m"), "M")
     want_last = cur - 1
-    have = set(cache.loc[cache["group"] == "total", "month"]) if not cache.empty else set()
+    need = {"total"} | {g for g, *_ in GROUPS}
+    by_m = cache.groupby("month")["group"].apply(set) if not cache.empty else pd.Series(dtype=object)
+    have = {m for m, gs in by_m.items() if need <= gs}
     first = pd.Period(f"{first_year}-01", "M")
     missing = [p for p in pd.period_range(first, want_last, freq="M") if str(p) not in have]
     if not missing:

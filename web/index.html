@@ -21,6 +21,7 @@
   --main:#135f8c; --band:#a9d3ea; --band2:#dcd8cf; --head:#0f4c75; --badge:#2b8fcc;
   --cmp1:#4a5057; --cmp2:#9b9a95; --neg:#b9533d; --chip:#ece8e0;
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
+  --s6:#8a63d2; --s7:#9c6b3f; --s8:#8a9a2b; --s9:#22a6b8;
 }
 @media (prefers-color-scheme:dark){
   :root:where(:not([data-theme="light"])){
@@ -31,6 +32,7 @@
     --main:#5aa9db; --band:#22506d; --band2:#33373c; --head:#8cc4ea; --badge:#2b8fcc;
     --cmp1:#c3c7cc; --cmp2:#7e8389; --neg:#e07a63; --chip:#23272b;
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+    --s6:#9a78e6; --s7:#b78452; --s8:#a3b23a; --s9:#2ab8cb;
   }
 }
 :root[data-theme="dark"]{
@@ -41,6 +43,7 @@
   --main:#5aa9db; --band:#22506d; --band2:#33373c; --head:#8cc4ea; --badge:#2b8fcc;
   --cmp1:#c3c7cc; --cmp2:#7e8389; --neg:#e07a63; --chip:#23272b;
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+  --s6:#9a78e6; --s7:#b78452; --s8:#a3b23a; --s9:#2ab8cb;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink)}
@@ -751,7 +754,10 @@ function renderChip() {
 function renderExports() {
   const X0 = DATA.exports, sec = $("#xi-sec");
   sec.hidden = !X0 || !X0.rows || !X0.rows.length; if (sec.hidden) return;
-  const Y0 = X0.year, G = X0.groups, cols = ["--s1", "--s2", "--s3", "--s4", "--s5", "--cmp2"];
+  const Y0 = X0.year, G = X0.groups;
+  const CM = { chip: "--s1", auto: "--s2", mach: "--s3", chem: "--s4", petro: "--s6", steel: "--s5", ship: "--s7", ict: "--s9", bio: "--s8", other: "--cmp2" };
+  const spare = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7", "--s8", "--s9"];
+  const cols = G.map((g, j) => CM[g.k] || spare[j % spare.length]);
   const cur = X0.rows.filter(r => r.m.startsWith(String(Y0))), prv = X0.rows.filter(r => r.m.startsWith(String(Y0 - 1)));
   const n = cur.length, eok = v => v / 100;
   $("#xi-h").textContent = `${Y0}년 품목별 수출액 (연간 누적)`;
@@ -822,10 +828,10 @@ function renderExports() {
   });
   rowsT.push(["합계", Math.round(tot[n - 1]).toLocaleString("ko-KR"), pSame ? fmt((tot[n - 1] / pSame - 1) * 100, 1) + "%" : "–", "100%",
     pSame ? fmt((tot[n - 1] / pSame - 1) * 100, 1) : "–"]);
-  const tb = smallTable(["품목", `1~${lastM}월(억달러)`, "전년비", "비중", "기여도(%p)"], rowsT);
+  const tb = smallTable(["품목", `1~${lastM}월`, "전년비", "비중", "기여%p"], rowsT);
   tb.lastChild.classList.add("sum"); more.appendChild(tb);
   const est = cur.filter(r => r.est);
-  const nt = h("p", "note", `HS 코드 기준 품목군(산업부 15대 품목 분류와 조금 다름) · 출처: ${X0.src}` +
+  const nt = h("p", "note", `금액 억달러 · IT기기 = 무선통신·컴퓨터·디스플레이 · HS 코드 기준 품목군(산업부 15대 품목 분류와 조금 다름) · 출처: ${X0.src}` +
     (est.length ? ` · ${est.map(r => +r.m.slice(5) + "월").join("·")} = 잠정치 합계·반도체 증감률${est.some(r => r.items_from && r.items_from.length > 1) ? "·품목 증감률" : ""}로 추정, 확정치(매월 15일경) 들어오면 교체` : ""));
   more.appendChild(nt);
 }
@@ -1198,7 +1204,7 @@ function renderMethod() {
       "통계표 번호는 고정하지 않고 실행 때 이름으로 찾음 → 표 번호가 바뀌어도 자동 추적"]],
     DATA.exports && ["부가: 품목별 수출액", [
       "관세청 품목별 수출입실적(공공데이터포털 API, 매월 15일경 전월 확정치) → 품목군 = HS 코드 묶음, 전체 = HS 2단위 류 합",
-      "반도체 8541·8542 · 자동차·부품 8703·8704·8708 · 석유제품·석유화학 2710·29류·39류 · 선박 89류 · 철강 72·73류 · 기타 = 전체 − 합",
+      DATA.exports.groups.filter(g => DATA.exports.hs[g.k]).map(g => `${g.label} ${DATA.exports.hs[g.k].map(c => (c[0] === "-" ? "−" + c.slice(1) : c) + (c.replace("-", "").length === 2 ? "류" : "")).join("·")}`).join(" / ") + " / 기타 = 전체 − 합",
       "확정치 없는 달: 관세청 월간 잠정치 보도자료 → 전체 금액, 반도체·주요 품목 증감률 × 전년 같은 달 (품목 증감률 없으면 '반도체 외' 증감률)"]],
     DATA.dist && ["부가: 분배 (소득 측)", [
       "경상 GDP = 피용자보수 + 총영업잉여 + 순생산·수입세",
