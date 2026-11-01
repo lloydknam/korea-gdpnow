@@ -151,7 +151,11 @@ dialog.chg::backdrop{background:rgba(20,24,29,.45)}
 .chg td.bar{width:34%;padding:6px 6px}
 .chg .bw{position:relative;height:10px;background:linear-gradient(var(--axis),var(--axis)) 50% 0/1px 100% no-repeat}
 .chg .bw i{position:absolute;top:1px;bottom:1px;border-radius:2px}
-.chg tr.sum td,#xi-more tr.sum td{font-weight:700;border-top:1px solid var(--axis)}
+.chg tr.sum td{font-weight:700;border-top:1px solid var(--axis)}
+#xi-more tr.tot td{font-weight:700;border-bottom:1px solid var(--axis)}
+#xi-more tr.xi-tg td{text-align:center;padding:4px 0;border-bottom:0}
+.xi-btn{border:0;background:var(--chip);color:var(--ink-2);font:inherit;font-size:12.5px;padding:6px 14px;border-radius:999px;cursor:pointer;width:100%}
+.xi-btn:hover{color:var(--ink)} .xi-btn:focus-visible{outline:2px solid var(--main);outline-offset:2px}
 .chg .note{margin-top:10px}
 .mini{display:grid;grid-template-columns:1fr;gap:14px}
 .mini h4{font-size:13.5px;margin:0;display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 8px}
@@ -843,10 +847,25 @@ function renderExports() {
     return [g.label + (rest.includes(g) || g.k === "other" ? " *" : ""), Math.round(v).toLocaleString("ko-KR"), pY[j] ? fmt((v / pY[j] - 1) * 100, 1) + "%" : "–", (v / tot[n - 1] * 100).toFixed(1) + "%",
       pY[j] && pSame ? fmt((v - pY[j]) / pSame * 100, 1) : "–"];
   });
-  rowsT.push(["합계", Math.round(tot[n - 1]).toLocaleString("ko-KR"), pSame ? fmt((tot[n - 1] / pSame - 1) * 100, 1) + "%" : "–", "100%",
+  rowsT.unshift(["합계", Math.round(tot[n - 1]).toLocaleString("ko-KR"), pSame ? fmt((tot[n - 1] / pSame - 1) * 100, 1) + "%" : "–", "100%",
     pSame ? fmt((tot[n - 1] / pSame - 1) * 100, 1) : "–"]);
-  const tb = smallTable(["품목", `1~${lastM}월 누적`, "전년비", "비중", "기여%p"], rowsT);
-  tb.lastChild.classList.add("sum"); more.appendChild(tb);
+  // 합계 + 상위 7개만 보이고 나머지는 눌러서 펼침
+  const SHOWN = 7, tb = smallTable(["품목", `1~${lastM}월 누적`, "전년비", "비중", "기여%p"], rowsT);
+  const trs = [...tb.querySelectorAll("tr")].slice(1);
+  trs[0].classList.add("tot");
+  const hid = trs.slice(1 + SHOWN);
+  if (hid.length) {
+    hid.forEach(tr => { tr.hidden = true; tr.classList.add("xi-x"); });
+    const tr = h("tr", "xi-tg"), td = h("td"); td.colSpan = 5;
+    const bt = h("button", "xi-btn"); bt.type = "button"; bt.setAttribute("aria-expanded", "false");
+    const lab = () => { const o = bt.getAttribute("aria-expanded") === "true"; bt.textContent = o ? "접기 ▲" : `나머지 ${hid.length}개 품목 펼치기 ▼`; };
+    bt.addEventListener("click", () => {
+      const o = bt.getAttribute("aria-expanded") !== "true";
+      bt.setAttribute("aria-expanded", String(o)); hid.forEach(r => { r.hidden = !o; }); lab();
+    });
+    lab(); td.appendChild(bt); tr.appendChild(td); tb.appendChild(tr);
+  }
+  more.appendChild(tb);
   const est = cur.filter(r => r.est);
   const nt = h("p", "note", `* 그래프에선 '기타'로 합쳐 표시 · 금액 억달러 · IT기기 = 무선통신·컴퓨터·디스플레이 · HS 코드 기준 품목군(산업부 15대 품목 분류와 조금 다름) · 출처: ${X0.src}` +
     (est.length ? ` · ${est.map(r => +r.m.slice(5) + "월").join("·")} = 잠정치 합계·반도체 증감률${est.some(r => r.items_from && r.items_from.length > 1) ? "·품목 증감률" : ""} + 품목군 최근 추세로 추정, 확정치(매월 15일경) 들어오면 교체` : ""));
