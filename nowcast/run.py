@@ -517,6 +517,14 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
             vy, py = cv[p] / cv[p - 12] - 1, cp[p] / cp[p - 12] - 1
             chips.append({"m": str(p), "vol": r(vy * 100, 1), "px": r(py * 100, 1),
                           "val": r(((1 + vy) * (1 + py) - 1) * 100, 1)})
+    try:  # 한은 미발표 달: 관세청 반도체 수출액 속보로 추정점(빗금·점선 표시)
+        for c in adjust.chip_flash_points(cv, cp, adjust.load_customs(ROOT / "data" / "customs_flash.csv")):
+            chips.append(c)
+            how = "실적" if c["px_how"] == "actual" else f"추세 월 {c['px_trend']:+.1f}%"
+            print(f"::notice::반도체 속보 {c['m']}({c['period']}): 금액 {c['val']:+.1f}% ÷ 단가 {c['px']:+.1f}%({how})"
+                  f" → 물량 {c['vol']:+.1f}%")
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::반도체 속보 추정 생략 — {type(e).__name__} {e}")
 
     # 6) 부가 분석 ❹ 실질 GNI ❺ 분배 ❻ 지출 측 — 실패해도 본 추정은 그대로
     ext = {"gni": None, "dist": None, "labor": None, "bop": None, "exp": None, "errors": []}

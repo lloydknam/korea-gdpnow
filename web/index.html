@@ -262,6 +262,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
     <p class="sub">전년동월비(%) · 단가 상승분은 실질성장률엔 빠지고 경상성장률(디플레이터)로 들어감</p>
     <div class="legend"><span><i class="key line" style="border-color:var(--main)"></i>물량 (수출물량지수)</span><span><i class="key dash"></i>단가 (수출물가·달러)</span></div>
     <div class="chart" id="c-chip"></div>
+    <p class="note" id="chip-note" hidden></p>
   </section>
 
   <section id="gni-sec" hidden>
@@ -690,16 +691,36 @@ function renderMini() {
 function renderChip() {
   const box = $("#c-chip"); box.replaceChildren();
   const rows = DATA.chips; if (rows.length < 2) return;
+  const est = rows.filter(r => r.est), nt = $("#chip-note"); nt.hidden = !est.length;
+  if (est.length) {
+    const e = est[est.length - 1], pn = { d10: "1~10일", d20: "1~20일", m: "월간" }[e.period] || "";
+    const rel = (DATA.releases || []).find(x => x.key === "prices");
+    nt.textContent = `${+e.m.slice(5)}월(음영) = 관세청 반도체 수출액 ${pn} ${fmt(e.val, 0)}% ÷ 단가 ` +
+      (e.px_how === "actual" ? `실적 ${fmt(e.px, 0)}%` : `추세 연장 ${fmt(e.px, 0)}%(달러, 월 ${fmt(e.px_trend, 1)}%)`) +
+      ` → 물량 ${fmt(e.vol, 0)}% 추정` + (rel ? ` · 한은 실적 ${+rel.date.slice(5, 7)}/${+rel.date.slice(8)}${rel.est ? " 예상" : ""} 발표 시 교체` : "");
+  }
   const W = box.clientWidth || 340, H = 190, m = { t: 12, r: 44, b: 22, l: 34 };
   const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "반도체 수출 물량과 단가" }, box);
   const ticks = niceTicks(Math.min(0, ...rows.flatMap(r => [r.vol, r.px])), Math.max(...rows.flatMap(r => [r.vol, r.px])));
   const X = i => m.l + (W - m.l - m.r) * i / (rows.length - 1);
   const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks[ticks.length - 1] - ticks[0]));
   grid(svg, ticks, Y, m.l, W - m.r);
+  // 한은 미발표 달 = 관세청 반도체 수출액 속보 ÷ 단가 추세 → 음영 구간 + 연한 선 + 속 빈 점
+  const ia = rows.findIndex(r => r.est), na = ia < 0 ? rows.length : ia;
+  if (ia > 0) {
+    const x0 = (X(ia - 1) + X(ia)) / 2;
+    el("rect", { x: x0, y: m.t, width: W - m.r - x0 + 6, height: H - m.t - m.b, fill: css("--chip") }, svg);
+    txt(svg, (x0 + W - m.r + 6) / 2, H - m.b - 5, "속보", { fill: css("--ink-3"), "font-size": 10, "text-anchor": "middle" });
+    grid(svg, ticks, Y, m.l, W - m.r);
+  }
   const S = [["px", css("--cmp1"), 2, "6 4"], ["vol", css("--main"), 2.5, null]];
-  S.forEach(([k, c, w, dash]) => el("path", { d: rows.map((r, i) => `${i ? "L" : "M"}${X(i)},${Y(r[k])}`).join(""), fill: "none", stroke: c, "stroke-width": w, "stroke-linejoin": "round", "stroke-linecap": "round", ...(dash ? { "stroke-dasharray": dash } : {}) }, svg));
+  const line = (k, a, b) => rows.slice(a, b + 1).map((r, i) => `${i ? "L" : "M"}${X(a + i)},${Y(r[k])}`).join("");
+  S.forEach(([k, c, w, dash]) => {
+    el("path", { d: line(k, 0, na - 1), fill: "none", stroke: c, "stroke-width": w, "stroke-linejoin": "round", "stroke-linecap": "round", ...(dash ? { "stroke-dasharray": dash } : {}) }, svg);
+    if (ia > 0) el("path", { d: line(k, ia - 1, rows.length - 1), fill: "none", stroke: c, "stroke-width": w, opacity: .6, "stroke-dasharray": dash || "2 3", "stroke-linecap": "round" }, svg);
+  });
   const L = rows[rows.length - 1], ys = S.map(([k]) => Y(L[k]));
-  S.forEach(([k, c], j) => el("circle", { cx: X(rows.length - 1), cy: ys[j], r: 4, fill: c, stroke: css("--bg"), "stroke-width": 2 }, svg));
+  S.forEach(([k, c], j) => rows.forEach((r, i) => { if (r.est || i === rows.length - 1) el("circle", { cx: X(i), cy: Y(r[k]), r: 4, fill: r.est ? css("--bg") : c, stroke: c, "stroke-width": 2 }, svg); }));
   if (Math.abs(ys[0] - ys[1]) > 14) S.forEach(([k], j) => txt(svg, X(rows.length - 1) + 8, ys[j] + 4, fmt(L[k], 0), { class: "lbl" }));
   rows.forEach((r, i) => { const mm = +r.m.slice(5); if (mm === 1 || i === 0) txt(svg, X(i), H - 6, `'${r.m.slice(2, 4)}.${mm}`, { "text-anchor": i === 0 ? "start" : "middle" }); });
   const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), opacity: 0 }, svg), tip = tipFor(box);
@@ -708,7 +729,11 @@ function renderChip() {
     const { sx, k } = svgPt(svg, W, e);
     const i = Math.max(0, Math.min(rows.length - 1, Math.round((sx - m.l) / (W - m.l - m.r) * (rows.length - 1)))), r = rows[i];
     cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", 1);
-    tip.show([{ v: r.m, cls: "k" }, { v: fmt(r.vol, 1) + "%", k: "물량", key: css("--main"), strong: true }, { v: fmt(r.px, 1) + "%", k: "단가", key: css("--cmp1"), dash: true, strong: true }, { v: fmt(r.val, 1) + "%", k: "금액(≈물량×단가)" }], X(i) * k, (m.t + 40) * k);
+    const pn = { d10: "1~10일", d20: "1~20일", m: "월간" }[r.period] || "";
+    tip.show(r.est ? [{ v: `${r.m} 속보 추정`, cls: "k" }, { v: fmt(r.val, 1) + "%", k: `금액(관세청 ${pn})`, strong: true },
+      { v: fmt(r.px, 1) + "%", k: r.px_how === "actual" ? "단가(한은)" : `단가(추세 월 ${fmt(r.px_trend, 1)}%)`, key: css("--cmp1"), dash: true },
+      { v: fmt(r.vol, 1) + "%", k: "물량 = 금액÷단가", key: css("--main"), strong: true }]
+      : [{ v: r.m, cls: "k" }, { v: fmt(r.vol, 1) + "%", k: "물량", key: css("--main"), strong: true }, { v: fmt(r.px, 1) + "%", k: "단가", key: css("--cmp1"), dash: true, strong: true }, { v: fmt(r.val, 1) + "%", k: "금액(≈물량×단가)" }], X(i) * k, (m.t + 40) * k);
   });
   hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
 }

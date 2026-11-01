@@ -151,6 +151,47 @@ def extend_split(total: pd.Series, chip: pd.Series | None, through: pd.Period, w
                               "added": k - 1, "from": str(t0 + 1), "to": str(through)}
 
 
+def extend_trend(x: pd.Series, through: pd.Period, months: int = 3, decay: float = TREND_DECAY):
+    """지수 하나를 최근 months개월 로그 추세(달마다 decay로 감쇠)로 through 월까지 연장."""
+    t = x.dropna()
+    last = t.index.max()
+    g = float(np.log(t).diff().tail(months).mean())
+    out, cum, p, k = t.copy(), 0.0, last + 1, 1
+    while p <= through:
+        cum += decay ** (k - 1)
+        out.loc[p] = t[last] * np.exp(g * cum)
+        p, k = p + 1, k + 1
+    return out.sort_index(), g * 100
+
+
+def chip_flash_points(chip_vol: pd.Series, chip_px: pd.Series, flash: pd.DataFrame) -> list[dict]:
+    """한은 반도체 물량·단가 미발표 달: 관세청 반도체 수출액 속보 ÷ 단가 추세 → 물량 추정.
+    금액은 조업일수 보정한 월 환산치(10·20일 속보면 부분 기간), 단가는 반도체 수출물가(달러) 추세 연장."""
+    out = []
+    if flash is None or flash.empty or "chip_yoy_pct" not in flash or chip_vol.dropna().empty:
+        return out
+    cv, cp = chip_vol.dropna(), chip_px.dropna()
+    last = cv.index.max()
+    fl = flash.dropna(subset=["chip_yoy_pct"])
+    refs = sorted(r for r in fl["ref"].unique() if r > last)
+    for ref in refs:
+        if (ref - 12) not in cv.index or (ref - 12) not in cp.index:
+            continue
+        row = fl[fl["ref"] == ref].sort_values("rank").iloc[-1].copy()
+        row["exports_yoy_pct"] = row["chip_yoy_pct"]
+        val = customs_full_month_yoy(row)
+        if ref in cp.index:
+            py, how, g = float(cp[ref] / cp[ref - 12] - 1), "actual", None
+        else:
+            ext, g = extend_trend(cp, ref)
+            py, how = float(ext[ref] / cp[ref - 12] - 1), "trend"
+        vy = (1 + val) / (1 + py) - 1
+        out.append({"m": str(ref), "vol": round(vy * 100, 1), "px": round(py * 100, 1), "val": round(val * 100, 1),
+                    "est": True, "period": row["period"], "px_how": how,
+                    "px_trend": None if g is None else round(g, 2)})
+    return out
+
+
 def extend_krw_by_fx(krw: pd.Series, usd: pd.Series, chip_usd: pd.Series | None, fx_daily: pd.Series,
                      through: pd.Period, recent_days: int = 5):
     """원화 가격지수 미발표 달 = 달러 가격지수(반도체·기타 추세 연장) × 환율.
