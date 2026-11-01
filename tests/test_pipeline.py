@@ -44,6 +44,12 @@ def test_pipeline(tmp_root=None):
     assert a and a["year"] == 2026 and a["nominal"] > a["real"], a
     assert len(a["path"]) == 4 and a["path"][2]["real_est"] and a["path"][1]["real_est"] is False
     assert a["change"] and len(a["history"]) == 2
+    # 연간 변동 상세: 항목 합 = 실제 변화(실질·경상), 광공업이 원인으로 잡힘
+    dt = a["history"][-1]["detail"]
+    assert dt and abs(sum(i["real"] for i in dt["items"]) - (dt["real_to"] - dt["real_from"])) < 0.005, dt
+    assert abs(sum(i["nom"] for i in dt["items"]) - (dt["nom_to"] - dt["nom_from"])) < 0.005, dt
+    assert any(i["key"] == "ip" and abs(i["real"]) > 0 for i in dt["items"]) and dt["quarters"], dt
+    assert a["history"][0]["detail"] is None
     yo = a["yoy"]
     assert yo[-1]["q"] == "2026Q4" and yo[-1]["real_band"] and not yo[0]["est"]
     # 부가 분석 ❹❺❻

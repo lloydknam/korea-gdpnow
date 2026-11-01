@@ -121,6 +121,35 @@ h3{font-size:15px;font-weight:800;letter-spacing:-.02em;margin:22px 0 2px}
 .evo-log td:last-child,.evo-log th:last-child{text-align:left;white-space:normal;padding-left:12px}
 .evo-log td:last-child{color:var(--ink-2);font-size:12px}
 .evo-log .d{color:var(--ink-3);font-size:11.5px;margin-left:3px}
+.evo-log tr.go{cursor:pointer}
+.evo-log tr.go:hover td,.evo-log tr.go:focus-visible td{background:var(--chip)}
+.evo-log tr.go:focus-visible{outline:2px solid var(--main);outline-offset:-2px}
+.evo-log tr.go td:first-child::after{content:"›";margin-left:6px;color:var(--ink-3);font-weight:700}
+dialog.chg{border:1px solid var(--rule);background:var(--bg);color:var(--ink);padding:0;width:min(560px,calc(100vw - 24px));
+  max-height:min(86vh,760px);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.28)}
+dialog.chg::backdrop{background:rgba(20,24,29,.45)}
+.chg .cb{padding:16px 18px 18px;overflow:auto;max-height:inherit}
+.chg .ch{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.chg .ch h3{margin:0;font-size:16px;line-height:1.35}
+.chg .ch small{display:block;font-weight:500;color:var(--ink-3);font-size:12px}
+.chg .x{border:0;background:var(--chip);color:var(--ink);width:32px;height:32px;border-radius:50%;font-size:18px;line-height:1;cursor:pointer;flex:none}
+.chg .x:focus-visible{outline:2px solid var(--main);outline-offset:2px}
+.chg .kp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 12px}
+.chg .kp>div{border:1px solid var(--rule);border-radius:8px;padding:8px 10px}
+.chg .kp .l{font-size:12px;color:var(--ink-2)}
+.chg .kp .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chg .kp .dv{display:block;font-size:13px;font-weight:700}
+.chg .up{color:var(--main)} .chg .dn{color:var(--neg)}
+.chg h4{font-size:13px;margin:14px 0 6px;color:var(--ink)}
+.chg .tags{display:flex;flex-wrap:wrap;gap:5px}
+.chg .tags span{font-size:12px;background:var(--chip);border-radius:999px;padding:2px 9px}
+.chg .why{font-size:13px;color:var(--ink-2);margin:10px 0 0;padding-left:16px}
+.chg .why li{margin:2px 0}
+.chg td.bar{width:34%;padding:6px 6px}
+.chg .bw{position:relative;height:10px;background:linear-gradient(var(--axis),var(--axis)) 50% 0/1px 100% no-repeat}
+.chg .bw i{position:absolute;top:1px;bottom:1px;border-radius:2px}
+.chg tr.sum td{font-weight:700;border-top:1px solid var(--axis)}
+.chg .note{margin-top:10px}
 .mini{display:grid;grid-template-columns:1fr;gap:14px}
 .mini h4{font-size:13.5px;margin:0;display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 8px}
 .mini h4 span{font-weight:500;color:var(--ink-2);font-size:12px}
@@ -299,6 +328,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
     </a>
   </footer>
 </main>
+<dialog class="chg" id="chgdlg" aria-labelledby="chgdlg-h"><div class="cb" id="chgdlg-b"></div></dialog>
 
 <script>
 const DATA = /*__DATA__*/null;
@@ -1084,8 +1114,8 @@ function renderEvo() {
   $("#evo-h").textContent = `${A.year}년 성장률 추정치 변화`;
   const hist = (A.history || []).filter(p => p.real != null);
   if (!hist.length) { box.appendChild(h("p", "sub", "갱신 누적 시 추이 표시")); return; }
-  const pts = hist.map(p => ({ t: new Date(p.at), real: p.real, nom: p.nominal,
-    rsd: p.real_sd ?? A.real_sd, nsd: p.nom_sd ?? A.nom_sd, new: p.new || [] }));
+  const pts = hist.map(p => ({ t: new Date(p.at), at: p.at, real: p.real, nom: p.nominal,
+    rsd: p.real_sd ?? A.real_sd, nsd: p.nom_sd ?? A.nom_sd, new: p.new || [], detail: p.detail || null }));
   const tEnd = Math.max(+new Date(DATA.generated_at), +pts[pts.length - 1].t);
   const t0 = +pts[0].t, span = Math.max(tEnd - t0, 2 * 864e5), t1 = t0 + span;
   const panels = [
@@ -1135,13 +1165,23 @@ function renderEvo() {
       tip.show(ls, xp * k, Y(p[P.k] + p[P.sd]) * k);
     });
     hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
+    hit.style.cursor = "pointer";
+    hit.addEventListener("click", e => {
+      const { sx } = svgPt(svg, W, e), tt = t0 + (sx - m.l) / (W - m.l - m.r) * span;
+      let i = 0; pts.forEach((p, j) => { if (+p.t <= tt) i = j; });
+      tip.hide(); openChange(pts, i);
+    });
   });
   // 최근 갱신 기록
   const rows = pts.slice().reverse().slice(0, 6);
   const t = h("table", "evo-log"), r0 = h("tr");
   ["갱신", "실질", "경상", "새로 반영"].forEach(x => r0.appendChild(h("th", "", x))); t.appendChild(r0);
   rows.forEach((p, i) => {
-    const prevP = pts[pts.length - 1 - i - 1], tr = h("tr");
+    const idx = pts.length - 1 - i, prevP = pts[idx - 1], tr = h("tr", "go");
+    tr.tabIndex = 0; tr.setAttribute("role", "button");
+    tr.setAttribute("aria-label", `${kst(p.at, { month: "numeric", day: "numeric" })} 갱신 변동 요인 보기`);
+    tr.addEventListener("click", () => openChange(pts, idx));
+    tr.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openChange(pts, idx); } });
     const md = new Date(p.t.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     tr.appendChild(h("td", "", `${md.getMonth() + 1}/${md.getDate()}`));
     ["real", "nom"].forEach(k => {
@@ -1153,8 +1193,89 @@ function renderEvo() {
     t.appendChild(tr);
   });
   box.appendChild(t);
+  box.appendChild(h("p", "note", "행·그래프 점 클릭 → 변동 요인 상세"));
   if (pts.length < 3) box.appendChild(h("p", "note", "갱신 이력 짧음. 지표 발표마다 한 칸씩 누적"));
 }
+
+// ---------------------------------------------------------------- 추정치 변화 상세 팝업
+function openChange(pts, i) {
+  const dlg = $("#chgdlg"), b = $("#chgdlg-b"), p = pts[i], pp = pts[i - 1], D = p.detail, Y = DATA.annual.year;
+  b.replaceChildren();
+  const head = h("div", "ch"), ht = h("h3", "", `${kst(p.at, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 갱신`);
+  ht.id = "chgdlg-h"; ht.appendChild(h("small", "", `${Y}년 연간 성장률 추정치 변화`));
+  const x = h("button", "x", "×"); x.type = "button"; x.setAttribute("aria-label", "닫기"); x.addEventListener("click", () => dlg.close());
+  head.append(ht, x); b.appendChild(head);
+  const rf = D ? D.real_from : pp?.real, nf = D ? D.nom_from : pp?.nom;
+  const kp = h("div", "kp");
+  [["실질성장률", rf, p.real], ["경상성장률", nf, p.nom]].forEach(([l, a, z]) => {
+    const c = h("div"); c.appendChild(h("div", "l", l));
+    const v = h("div", "v", a != null ? `${a.toFixed(2)} → ${z.toFixed(2)}%` : `${z.toFixed(2)}%`);
+    if (a != null) { const dv = z - a; v.appendChild(h("span", "dv " + (dv >= 0 ? "up" : "dn"), `${dv >= 0 ? "▲" : "▼"}${Math.abs(dv).toFixed(2)}%p`)); }
+    c.appendChild(v); kp.appendChild(c);
+  });
+  b.appendChild(kp);
+  if (!pp) { b.appendChild(h("p", "note", "첫 추정. 비교 대상 없음")); dlg.showModal(); return; }
+  b.appendChild(h("h4", "", "새로 반영된 자료"));
+  const tags = h("div", "tags");
+  (p.new.length ? p.new : ["신규 발표 없음 → 모형·보간 변화"]).forEach(t => tags.appendChild(h("span", "", t)));
+  b.appendChild(tags);
+  if (!D) {
+    b.appendChild(h("p", "note", "요인 분해 기록 없음(분해 기능 도입 전 갱신). 이후 갱신부터 항목별 표시"));
+    dlg.showModal(); return;
+  }
+  // 요약 문장: 실질·경상 주요인
+  const its = D.items.filter(t => t.key !== "interp"), why = h("ul", "why");
+  const top = (k) => its.filter(t => Math.abs(t[k]) >= 0.005).sort((a, c) => Math.abs(c[k]) - Math.abs(a[k])).slice(0, 2);
+  const say = (k, nm) => {
+    const tt = top(k); if (!tt.length) return;
+    why.appendChild(h("li", "", `${nm} ${D[k === "real" ? "real_to" : "nom_to"] - D[k === "real" ? "real_from" : "nom_from"] >= 0 ? "상향" : "하향"} 주요인: ` +
+      tt.map(t => `${t.label} ${fmt(t[k], 2)}%p`).join(", ")));
+  };
+  say("real", "실질");
+  const sig = k => top(k).map(t => t.label + t[k].toFixed(2)).join();
+  if (sig("nom") !== sig("real")) say("nom", "경상");
+  const pr = its.filter(t => Math.abs(t.real) < 0.0005 && Math.abs(t.nom) >= 0.005);
+  if (pr.length) why.appendChild(h("li", "", `물가(디플레이터) 경로만 바꾼 항목 → 경상에만 영향: ${pr.map(t => t.label).join(", ")}`));
+  if (why.children.length) b.appendChild(why);
+  // 요인 표 + 막대
+  b.appendChild(h("h4", "", "변동 요인 (연간 성장률 기여, %p)"));
+  const mx = Math.max(0.01, ...D.items.flatMap(t => [Math.abs(t.real), Math.abs(t.nom)]));
+  const bar = (v, col) => {
+    const td = h("td", "bar"), w = h("div", "bw"), i = h("i"), f = Math.min(1, Math.abs(v) / mx) * 50;
+    i.style.cssText = `background:${v >= 0 ? col : "var(--neg)"};width:${f}%;${v >= 0 ? "left:50%" : "right:50%"}`;
+    w.appendChild(i); td.appendChild(w); return td;
+  };
+  const t = h("table"), r0 = h("tr");
+  ["항목", "실질", "", "경상", ""].forEach(z => r0.appendChild(h("th", "", z))); t.appendChild(r0);
+  D.items.forEach(it => {
+    const tr = h("tr");
+    tr.appendChild(h("td", "", it.label));
+    tr.appendChild(h("td", "", Math.abs(it.real) < 0.0005 ? "–" : fmt(it.real, 2))); tr.appendChild(bar(it.real, "var(--main)"));
+    tr.appendChild(h("td", "", Math.abs(it.nom) < 0.0005 ? "–" : fmt(it.nom, 2))); tr.appendChild(bar(it.nom, "var(--cmp1)"));
+    t.appendChild(tr);
+  });
+  const sr = h("tr", "sum"); sr.appendChild(h("td", "", "합계"));
+  sr.appendChild(h("td", "", fmt(D.real_to - D.real_from, 2))); sr.appendChild(h("td"));
+  sr.appendChild(h("td", "", fmt(D.nom_to - D.nom_from, 2))); sr.appendChild(h("td"));
+  t.appendChild(sr); b.appendChild(t);
+  // 분기별 경로
+  if (D.quarters && D.quarters.length) {
+    b.appendChild(h("h4", "", "분기별 경로 변화 (전기비, %)"));
+    const ar = v => v.toFixed(2);
+    b.appendChild(smallTable(["분기", "실질", "디플레이터"], D.quarters.map(q => [
+      qlab(q.q) + (q.est ? " (추정)" : ""),
+      { v: `${ar(q.real_from)} → ${ar(q.real_to)}`, est: q.est },
+      `${ar(q.defl_from)} → ${ar(q.defl_to)}`])));
+  }
+  const n = h("div", "note"), ul = h("ul");
+  ["연간 기여 = 분기 전기비 변화 × 연간 반영 가중치 → 당해 1~4분기 1·0.75·0.5·0.25, 전년 2~4분기 0.25·0.5·0.75",
+   "지표 항목 = 브리지 계수 × 분기 지표 변화(미발표 달 AR 보간 변화 포함)",
+   "경상 = 실질 기여 + 디플레이터(물가) 기여",
+   "기타 = 연쇄 계산 비선형·교차항 등 근사 오차. 합계는 실제 변화와 일치"].forEach(z => ul.appendChild(h("li", "", z)));
+  n.appendChild(ul); b.appendChild(n);
+  dlg.showModal(); x.focus();
+}
+document.addEventListener("click", e => { const d = $("#chgdlg"); if (d && e.target === d) d.close(); });
 
 function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderGNI(); renderBop(); renderDist(); renderLabor(); renderExp(); renderCal(); renderBT(); renderMethod(); }
 if (DATA) {

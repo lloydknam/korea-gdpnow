@@ -197,6 +197,70 @@ def decompose(prev: dict | None, cur: dict, bridge_prev: dict | None, bridge_cur
     return out
 
 
+# ------------------------------------------------------------------ 연간 추정치 변동 분해
+EXTRA_LABELS = {CONST_KEY: "모형 재추정(실질)", "_dmodel": "디플레이터 식 재추정", "gdp_rel": "실질 GDP 발표·개정",
+                "nom_rel": "명목 GDP 발표·개정", "interp": "기타(보간·연쇄 근사)"}
+
+
+def annual_change_detail(prev_path, year, real_map, defl_map, src, cur_rx, cur_dx, bridge, dbridge,
+                         labels, dlabels, ann, last_row, run_new, now):
+    """직전 기록 대비 연간 실질·경상 성장률 변화를 원인별로 분해.
+    연간 성장률 ≈ Σ 분기 가중치 × 분기 전기비(당해 p분기 (5−p)/4, 전년 p분기 (p−1)/4).
+    추정 분기 변화 = Σ 계수 × 지표 변화 + 식 재추정 효과. 실적 분기 변화 = GDP 발표·개정. 경상 = 실질 + 디플레이터."""
+    if not prev_path or prev_path.get("year") != year or last_row is None or last_row.empty:
+        return None
+    w = lambda q: (5 - q.quarter) / 4 if q.year == year else (q.quarter - 1) / 4 if q.year == year - 1 else 0.0
+    agg, quarters = {}, []
+
+    def add(key, real=0.0, nom=0.0):
+        a = agg.setdefault(key, {"real": 0.0, "nom": 0.0})
+        a["real"] += real
+        a["nom"] += nom
+
+    def split(px, cx, b_prev, b_cur, model_key):
+        """지표별 기여 + 재추정 효과. 반환 {key: Δ}."""
+        ch = decompose({"x": px}, {"x": cx}, b_prev, b_cur) or []
+        return {(model_key if c["key"] == CONST_KEY else c["key"]): c["delta"] for c in ch if np.isfinite(c["delta"])}
+
+    for qs_, pv in prev_path["q"].items():
+        q = pd.Period(qs_, "Q")
+        if q not in real_map or q not in defl_map or w(q) == 0:
+            continue
+        wq = w(q)
+        dr, dd = real_map[q] - pv["real"], defl_map[q] - pv["defl"]
+        # 실질
+        if q in cur_rx and pv.get("rx"):
+            parts = split(pv["rx"], cur_rx[q], prev_path.get("bridge"), bridge, CONST_KEY)
+            for k, v in parts.items():
+                add(k, wq * v, wq * v)
+            rest = dr - sum(parts.values())
+            add("interp", wq * rest, wq * rest)
+        elif abs(dr) > 1e-9:
+            add("gdp_rel" if q not in cur_rx else "interp", wq * dr, wq * dr)
+        # 디플레이터
+        if q in cur_dx and pv.get("dx"):
+            parts = split(pv["dx"], cur_dx[q], prev_path.get("dbridge"), dbridge, "_dmodel")
+            for k, v in parts.items():
+                add("d_" + k if k != "_dmodel" else k, 0.0, wq * v)
+            add("interp", 0.0, wq * (dd - sum(parts.values())))
+        elif abs(dd) > 1e-9:
+            add("nom_rel" if q not in cur_dx else "interp", 0.0, wq * dd)
+        if abs(dr) > 1e-4 or abs(dd) > 1e-4:
+            quarters.append({"q": qs_, "real_from": r(pv["real"], 2), "real_to": r(real_map[q], 2),
+                             "defl_from": r(pv["defl"], 2), "defl_to": r(defl_map[q], 2),
+                             "est": src.get(q, {}).get("real") == "n"})
+    rf, nf = float(last_row["real"].iloc[0]), float(last_row["nominal"].iloc[0])
+    # 연쇄(비선형) 근사 오차는 기타에 합산 → 합계 = 실제 변화
+    add("interp", (ann["real"] - rf) - sum(a["real"] for a in agg.values()),
+        (ann["nominal"] - nf) - sum(a["nom"] for a in agg.values()))
+    lab = {**labels, **{"d_" + k: v for k, v in dlabels.items()}, **EXTRA_LABELS}
+    items = [{"key": k, "label": lab.get(k, k), "real": r(v["real"], 3), "nom": r(v["nom"], 3)}
+             for k, v in agg.items() if abs(v["real"]) >= 0.0005 or abs(v["nom"]) >= 0.0005]
+    items.sort(key=lambda x: (x["key"] == "interp", -max(abs(x["real"] or 0), abs(x["nom"] or 0))))
+    return {"at": now.isoformat(timespec="minutes"), "real_from": r(rf, 3), "real_to": r(ann["real"], 3),
+            "nom_from": r(nf, 3), "nom_to": r(ann["nominal"], 3), "new": run_new, "items": items, "quarters": quarters}
+
+
 # ------------------------------------------------------------------ 메인
 def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None) -> dict:
     cfg = yaml.safe_load((ROOT / "config" / "series.yaml").read_text())
@@ -250,7 +314,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
     # 4) 대상 분기별 실시간 추정
     hist_path = data_dir / "history.csv"
     hist = pd.read_csv(hist_path) if hist_path.exists() else pd.DataFrame()
-    targets_out, new_hist, real_nc = [], [], {}
+    targets_out, new_hist, real_nc, cur_rx, cur_dx = [], [], {}, {}, {}
     for q in target_quarters(gdp, now):
         nc = model.nowcast(levels, esi, q, bridge, mcfg)
         k_known = model.months_known(raw["ip"], q)
@@ -260,6 +324,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         through = {k: f"{meta[k]['actual_last']}|{meta[k]['last']}" for k in keys}
         prev = state["runs"].get(qs)
         changes = decompose(prev, nc, prev and prev.get("bridge"), bridge)
+        cur_rx[q] = {k: float(nc["x"][k]) for k in keys}
         # 예전 state(마지막 월만 저장)와도 비교되도록: '|'가 없으면 보강 후 월만 비교
         _same = lambda old, new: old == new if (old is None or "|" in old) else old == new.split("|")[1]
         new_data = [labels[k] for k in keys
@@ -312,6 +377,8 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
     mcfg_d = {**mcfg, "bridge_start": dcfg["bridge_start"]}
     Xd = pd.DataFrame({k: model.q_growth(levels[k]) for k in dkeys})
     dbridge = model.fit_bridge(defl, Xd, mcfg_d["bridge_start"], mcfg["exclude_quarters"])
+    dbridge["id"] = hashlib.sha1(json.dumps([round(dbridge["const"], 4), {k: round(v, 4) for k, v in dbridge["coef"].items()}],
+                                            sort_keys=True).encode()).hexdigest()[:10]
     dbt = model.backtest(levels, None, defl, mcfg_d, dkeys)
 
     year = annual_year(gdp)
@@ -324,11 +391,14 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
             if q in real_nc:
                 v, sd, _ = real_nc[q]
             else:  # 아직 탭에 없는 먼 분기: 지표 전부 AR 외삽
-                v, sd = model.nowcast(levels, esi, q, bridge, mcfg)["value"], bt["rmse"]["0"]
+                far = model.nowcast(levels, esi, q, bridge, mcfg)
+                v, sd = far["value"], bt["rmse"]["0"]
+                cur_rx[q] = {k: float(far["x"][k]) for k in keys}
             real_map[q], sd_r[q] = v, sd
             src.setdefault(q, {})["real"] = "n"
         if q not in defl_map:
             dn = model.nowcast(levels, None, q, dbridge, mcfg_d)
+            cur_dx[q] = {k: float(dn["x"][k]) for k in dkeys}
             kd = model.months_known(raw["px"], q)
             defl_map[q] = dn["value"]
             sd_d[q] = dbt["rmse"].get(str(kd)) or dbridge["sd"]
@@ -369,11 +439,20 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         state["defl_through"] = dthrough
         if bridge_prev and bridge_prev.get("id") != bridge.get("id"):
             run_new.append("GDP 발표·개정")
+        pname = {"d10": "1~10일", "d20": "1~20일", "m": "월간"}
+        csig = ";".join(f"{c['month']}:{c['period']}" for c in customs_used)
+        if state.get("customs_sig") is not None and state["customs_sig"] != csig and customs_used:
+            c = customs_used[-1]
+            lab = f"관세청 속보({int(c['month'][5:])}월 {pname.get(c['period'], c['period'])})"
+            if lab not in run_new:
+                run_new.append(lab)
+        state["customs_sig"] = csig
 
         # 연간 추정치 이력 (값이 바뀔 때만 한 줄)
         ah_path = data_dir / "annual_history.csv"
         ah = pd.read_csv(ah_path) if ah_path.exists() else pd.DataFrame(columns=["run_at", "year", "real", "nominal"])
         last = ah[ah["year"] == year].tail(1)
+        appended = False
         run_new += [x for x in new_actuals if x not in run_new]
         if last.empty or new_actuals or abs(float(last["real"].iloc[0]) - ann["real"]) >= 0.005 \
                 or abs(float(last["nominal"].iloc[0]) - ann["nominal"]) >= 0.005:
@@ -381,20 +460,41 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
                 annual["change"] = {"at": now.isoformat(timespec="minutes"),
                                     "real_from": r(float(last["real"].iloc[0])),
                                     "nominal_from": r(float(last["nominal"].iloc[0]))}
+            detail = annual_change_detail(state.get("annual_path"), year, real_map, defl_map, src, cur_rx, cur_dx,
+                                          bridge, dbridge, labels, dlabels, ann, last, run_new, now)
+            if detail:
+                ac_path = data_dir / "annual_changes.json"
+                ac = json.loads(ac_path.read_text()) if ac_path.exists() else {}
+                ac[detail["at"]] = detail
+                ac = dict(sorted(ac.items())[-80:])
+                ac_path.write_text(json.dumps(ac, ensure_ascii=False, indent=1))
             ah = pd.concat([ah, pd.DataFrame([{"run_at": now.isoformat(timespec="minutes"), "year": year,
                                                "real": r(ann["real"], 3), "nominal": r(ann["nominal"], 3),
                                                "real_sd": r(rs, 3), "nom_sd": r(float(np.hypot(rs, ds)), 3),
                                                "new_data": "|".join(run_new)}])],
                            ignore_index=True)
             ah.to_csv(ah_path, index=False)
+            appended = True
         else:
             annual["change"] = state.get("annual_change")
         state["annual_change"] = annual.get("change")
+        # 기준 시점 스냅샷: 이력에 한 줄 추가될 때만 갱신 → 다음 변화는 직전 '기록' 대비로 분해
+        if appended or not state.get("annual_path") or state["annual_path"].get("year") != year:
+            win = pd.period_range(f"{year - 1}Q2", f"{year}Q4", freq="Q")
+            bsnap = lambda b: {"id": b["id"], "const": float(b["const"]), "coef": {k: float(v) for k, v in b["coef"].items()}}
+            state["annual_path"] = {
+                "year": year, "bridge": bsnap(bridge), "dbridge": bsnap(dbridge),
+                "q": {str(qq): {"real": float(real_map[qq]), "defl": float(defl_map[qq]),
+                                "rx": cur_rx.get(qq), "dx": cur_dx.get(qq)}
+                      for qq in win if qq in real_map and qq in defl_map}}
+        ac_path = data_dir / "annual_changes.json"
+        acd = json.loads(ac_path.read_text()) if ac_path.exists() else {}
         ay = ah[ah["year"] == year]
         num = lambda v: None if pd.isna(v) else r(float(v), 3)
         annual["history"] = [{"at": row["run_at"], "real": num(row["real"]), "nominal": num(row["nominal"]),
                               "real_sd": num(row.get("real_sd")), "nom_sd": num(row.get("nom_sd")),
-                              "new": [x for x in str(row.get("new_data") if pd.notna(row.get("new_data")) else "").split("|") if x]}
+                              "new": [x for x in str(row.get("new_data") if pd.notna(row.get("new_data")) else "").split("|") if x],
+                              "detail": acd.get(row["run_at"])}
                              for _, row in ay.iterrows()]
 
     if new_hist:
