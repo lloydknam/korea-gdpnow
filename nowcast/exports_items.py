@@ -221,3 +221,39 @@ def section(key: str | None, data_dir: Path, now: datetime, flash: pd.DataFrame 
     return {"year": year, "groups": [{"k": g, "label": lab} for g, lab, *_ in GROUPS] + [{"k": OTHER[0], "label": OTHER[1]}],
             "rows": keep, "src": "관세청 품목별 수출입실적(HS 기준 품목군) · 최근 달은 관세청 월간 잠정치",
             "hs": {g: codes for g, _, codes, _ in GROUPS}}
+
+
+def probe_ecos(ecos_key: str | None, data_dir: Path, now: datetime, session=None) -> None:
+    """공공데이터포털 키가 없을 때: 한은 ECOS에 품목별 수출 통계표가 있는지 이름으로 찾아 기록(7일에 1번).
+    결과 → data/ecos_export_probe.json (후보 표·항목 이름). 계산엔 아직 안 씀."""
+    if not ecos_key:
+        return
+    import json
+    from .bop import Ecos
+    path = data_dir / "ecos_export_probe.json"
+    try:
+        old = json.loads(path.read_text()) if path.exists() else {}
+        if old.get("at") and (now - datetime.fromisoformat(old["at"]).replace(tzinfo=now.tzinfo)).days < 7:
+            return
+    except (ValueError, TypeError):
+        pass
+    try:
+        e = Ecos(ecos_key, session)
+        keys = ("품목", "MTI", "SITC", "성질", "통관", "상품")
+        cands = [t for t in e.tables() if "수출" in (t.get("STAT_NAME") or "") and any(k in t["STAT_NAME"] for k in keys)]
+        out = []
+        for t in cands[:15]:
+            try:
+                its = e.items(t["STAT_CODE"])
+            except Exception:  # noqa: BLE001
+                its = []
+            out.append({"stat": t["STAT_CODE"], "name": t["STAT_NAME"], "cycle": t.get("CYCLE"),
+                        "items": [f"{i.get('ITEM_CODE')} {i.get('ITEM_NAME')} [{i.get('CYCLE')}, {i.get('UNIT_NAME')}]"
+                                  for i in its[:40]]})
+            print(f"::notice::ECOS 품목별 수출 후보: {t['STAT_CODE']} {t['STAT_NAME']} ({len(its)}개 항목)")
+        path.write_text(json.dumps({"at": now.isoformat(timespec="minutes"), "tables": out}, ensure_ascii=False, indent=1))
+        if not out:
+            print("::notice::ECOS 품목별 수출 후보 없음")
+    except Exception as ex:  # noqa: BLE001
+        print(f"::warning::ECOS 품목별 수출 탐색 실패 — {type(ex).__name__} {ex}")
+

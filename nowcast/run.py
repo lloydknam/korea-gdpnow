@@ -541,6 +541,8 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
                          ("dist", lambda: extras.dist_section(xr)),
                          ("labor", lambda: extras.labor_section(xr, annual)),
                          ("bop", lambda: bop.section(os.environ.get("ECOS_API_KEY"), data_dir, now)),
+                         ("exports_probe", lambda: None if os.environ.get("DATA_GO_KR_KEY") else
+                          exports_items.probe_ecos(os.environ.get("ECOS_API_KEY"), data_dir, now)),
                          ("exports", lambda: exports_items.section(os.environ.get("DATA_GO_KR_KEY"), data_dir, now,
                                                                    adjust.load_customs(data_dir / "customs_flash.csv"))),
                          ("exp", lambda: extras.exp_section(cfg, xr, levels, esi, list(real_nc), prod))]:
