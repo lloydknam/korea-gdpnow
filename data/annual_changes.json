@@ -108,5 +108,37 @@
     "est": true
    }
   ]
+ },
+ "2026-11-06T15:51+09:00": {
+  "at": "2026-11-06T15:51+09:00",
+  "real_from": 3.824,
+  "real_to": 3.824,
+  "nom_from": 24.16,
+  "nom_to": 24.171,
+  "new": [],
+  "items": [
+   {
+    "key": "d_px",
+    "label": "수출물가(원화)",
+    "real": 0.0,
+    "nom": 0.009
+   },
+   {
+    "key": "interp",
+    "label": "기타(보간·연쇄 근사)",
+    "real": 0.0,
+    "nom": 0.002
+   }
+  ],
+  "quarters": [
+   {
+    "q": "2026Q4",
+    "real_from": 1.01,
+    "real_to": 1.01,
+    "defl_from": 0.85,
+    "defl_to": 0.89,
+    "est": true
+   }
+  ]
  }
 }
