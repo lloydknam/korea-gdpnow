@@ -175,6 +175,12 @@ summary{cursor:pointer;font-size:13px;color:var(--ink-2);padding:4px 0}
 .note li b{color:var(--ink);font-weight:700}
 .note ul ul{margin:2px 0 6px;padding-left:16px;list-style:'– '}
 .note ul ul li{margin:1px 0}
+.lab .lab-list{list-style:none;padding:0;margin:10px 0 0}
+.lab .lab-list li{margin:0;border-top:1px solid var(--rule)}
+.lab .lab-list a{display:block;padding:12px 2px;color:var(--ink);text-decoration:none;font-size:15px}
+.lab .lab-list a:hover b{color:var(--main)}
+.lab .lab-list b{font-weight:800}
+.lab .lab-list span{display:block;font-size:12.5px;color:var(--ink-2);margin-top:2px}
 footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 .inst{font-family:Georgia,"Times New Roman","Nanum Myeongjo",serif;font-size:30px;font-weight:700;letter-spacing:.14em;line-height:1.2;color:var(--ink);text-transform:uppercase}
 .inst i{font-style:italic;letter-spacing:.05em;text-transform:none}
@@ -334,6 +340,14 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
   <section class="note">
     <h2>방법</h2>
     <ul id="method"></ul>
+  </section>
+
+  <section class="note lab">
+    <h2>실험실</h2>
+    <p class="sub">실험 중인 시각화 모음 · 공식 통계 아님</p>
+    <ul class="lab-list">
+      <li><a href="lab/income-assets/" target="_blank" rel="noopener"><b>소득자산 분석</b> <span>연령대별 소득·자산 변화를 갭마인더 차트로 보기 ↗</span></a></li>
+    </ul>
   </section>
 
   <footer>
