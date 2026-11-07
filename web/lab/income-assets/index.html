@@ -37,7 +37,7 @@ svg text{fill:var(--ink-3);font-size:11px;font-family:inherit}
 <main>
   <a class="back" href="../../">← Korea GDP Now</a>
   <h1>소득자산 분석</h1>
-  <p class="sub">연령계층별 가구 평균 소득·자산의 변화 · 버블 크기 = 가구 비중</p>
+  <p class="sub">연령대(5세 구간)별 가구 평균 소득·자산의 변화 · 버블 크기 = 가구 수</p>
 
   <div id="root"></div>
 
@@ -139,7 +139,7 @@ function render(D, groups, years) {
   function showTip(g, idx, c) {
     const d = g.data[years[idx]];
     if (!d) { tip.style.opacity = 0; return; }
-    tip.innerHTML = `<b>${g.label}</b> · ${years[idx]}<br>소득 ${fmtMan(d.income)} · 자산 ${fmtMan(d.asset)}${d.households != null ? "<br>가구 비중 " + d.households.toFixed(1) + "%" : ""}`;
+    tip.innerHTML = `<b>${g.label}</b> · ${years[idx]}<br>소득 ${fmtMan(d.income)} · 자산 ${fmtMan(d.asset)}${d.households != null ? "<br>가구 " + Math.round(d.households).toLocaleString("ko-KR") : ""}`;
     const box = svg.getBoundingClientRect(), wrapBox = wrap.getBoundingClientRect();
     const sx = box.width / W;
     tip.style.left = (box.left - wrapBox.left + X(d.income) * sx + 10) + "px";
