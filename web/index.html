@@ -738,7 +738,13 @@ function renderChip() {
   const L = rows[rows.length - 1], ys = S.map(([k]) => Y(L[k]));
   S.forEach(([k, c], j) => rows.forEach((r, i) => { if (r.est || i === rows.length - 1) el("circle", { cx: X(i), cy: Y(r[k]), r: 4, fill: r.est ? css("--bg") : c, stroke: c, "stroke-width": 2 }, svg); }));
   if (Math.abs(ys[0] - ys[1]) > 14) S.forEach(([k], j) => txt(svg, X(rows.length - 1) + 8, ys[j] + 4, fmt(L[k], 0), { class: "lbl" }));
-  rows.forEach((r, i) => { const mm = +r.m.slice(5); if (mm === 1 || i === 0) txt(svg, X(i), H - 6, `'${r.m.slice(2, 4)}.${mm}`, { "text-anchor": i === 0 ? "start" : "middle" }); });
+  // x축: 첫 달 + 매년 1월. 첫 달 라벨이 바로 뒤 1월 라벨과 겹치면(48px 미만) 첫 달 라벨은 생략
+  { const jan = rows.findIndex((r, i) => i > 0 && +r.m.slice(5) === 1);
+    rows.forEach((r, i) => {
+      const mm = +r.m.slice(5);
+      if (i === 0 && jan > 0 && X(jan) - X(0) < 48) return;
+      if (mm === 1 || i === 0) txt(svg, X(i), H - 6, `'${r.m.slice(2, 4)}.${mm}`, { "text-anchor": i === 0 ? "start" : "middle" });
+    }); }
   const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), opacity: 0 }, svg), tip = tipFor(box);
   const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
   hit.addEventListener("pointermove", e => {

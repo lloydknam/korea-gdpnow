@@ -52,7 +52,7 @@ def test_pipeline(tmp_root=None):
     assert a["history"][0]["detail"] is None
     # 반도체: 한은 미발표 달은 관세청 반도체 수출액 ÷ 단가 추세로 추정점
     ce = [c for c in p2["chips"] if c.get("est")]
-    assert ce and ce[-1]["m"] == "2026-10" and ce[-1]["period"] == "m", ce
+    assert ce and ce[0]["m"] == "2026-09" and ce[-1]["m"] >= "2026-10", ce   # 실제 속보 CSV가 늘어나도 통과
     assert abs((1 + ce[-1]["vol"] / 100) * (1 + ce[-1]["px"] / 100) - 1 - ce[-1]["val"] / 100) < 0.002, ce[-1]
     assert not any(c.get("est") for c in p2["chips"][:-len(ce)])
     yo = a["yoy"]
