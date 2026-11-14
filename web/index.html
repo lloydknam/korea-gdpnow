@@ -152,6 +152,11 @@ dialog.chg::backdrop{background:rgba(20,24,29,.45)}
 .chg .bw{position:relative;height:10px;background:linear-gradient(var(--axis),var(--axis)) 50% 0/1px 100% no-repeat}
 .chg .bw i{position:absolute;top:1px;bottom:1px;border-radius:2px}
 .chg tr.sum td{font-weight:700;border-top:1px solid var(--axis)}
+.spot{margin-top:16px;border:1px solid var(--rule);border-radius:10px;padding:12px 12px 6px}
+.spot-h{display:flex;align-items:center;gap:8px;font-size:14px}
+.spot-badge{font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:999px;color:#fff;background:var(--cmp2)}
+.spot-badge.sb-warn{background:var(--neg)} .spot-badge.sb-watch{background:var(--s4)} .spot-badge.sb-up{background:var(--s3)}
+.spot-t{font-size:13px;margin:6px 0 8px;color:var(--ink)}
 #xi-more tr.tot td{font-weight:700;border-bottom:1px solid var(--axis)}
 #xi-more tr.xi-tg td{text-align:center;padding:4px 0;border-bottom:0}
 .xi-btn{border:0;background:var(--chip);color:var(--ink-2);font:inherit;font-size:12.5px;padding:6px 14px;border-radius:999px;cursor:pointer;width:100%}
@@ -270,6 +275,14 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
     <div class="legend"><span><i class="key line" style="border-color:var(--main)"></i>물량 (수출물량지수)</span><span><i class="key dash"></i>단가 (수출물가·달러)</span></div>
     <div class="chart" id="c-chip"></div>
     <p class="note" id="chip-note" hidden></p>
+    <div class="spot" id="spot-box" hidden>
+      <div class="spot-h"><span class="spot-badge" id="spot-badge"></span><b>선행 경고 · D램 현물가</b></div>
+      <p class="spot-t" id="spot-text"></p>
+      <div class="legend" id="spot-legend"></div>
+      <div class="chart" id="c-spot"></div>
+      <div id="spot-tbl"></div>
+      <p class="note" id="spot-note"></p>
+    </div>
   </section>
 
   <section id="xi-sec" hidden>
@@ -772,6 +785,44 @@ function hsTxt(codes) {
   return [...out, ...plus].join("·") + (minus.length ? "(−" + minus.join("·") + ")" : "");
 }
 
+// ================================================================ D램 현물가 선행 경고
+function renderSpot() {
+  const S = DATA.dram_spot, sec = $("#spot-box");
+  sec.hidden = !S || !S.series; if (sec.hidden) return;
+  const LV = { warn: "경고", watch: "주의", up: "상승", flat: "보합", na: "축적 중" };
+  const bd = $("#spot-badge"); bd.textContent = LV[S.level] || S.level; bd.className = "spot-badge sb-" + S.level;
+  $("#spot-text").textContent = S.text;
+  const KEYS = [["ddr5_16g", "DDR5 16Gb", "--s1"], ["ddr4_16g", "DDR4 16Gb", "--s2"], ["ddr4_8g", "DDR4 8Gb", "--cmp1"]].filter(([k]) => S.series[k]);
+  const lg = $("#spot-legend"); lg.replaceChildren();
+  KEYS.forEach(([k, lab, c]) => { const sp = h("span"), ky = h("i", "key line"); ky.style.borderColor = css(c); sp.append(ky, lab); lg.appendChild(sp); });
+  // 그래프: 최근 6개월, 품목별 가격 수준이 달라 지수화(품목별 최신값 = 100) → 과거가 지금보다 얼마나 높았나/낮았나
+  const box = $("#c-spot"); box.replaceChildren();
+  const end = new Date(Math.max(...KEYS.map(([k]) => +new Date(S.series[k].at(-1).d)))), t0 = +end - 183 * 864e5;
+  const ser = KEYS.map(([k, lab, c]) => {
+    const pts = S.series[k].filter(p => +new Date(p.d) >= t0); const b0 = pts.length ? pts.at(-1).v : null;
+    return { k, lab, c, pts: pts.map(p => ({ t: +new Date(p.d), v: p.v, i: p.v / b0 * 100 })) };
+  }).filter(s => s.pts.length);
+  const W = box.clientWidth || 340, H = 160, m = { t: 10, r: 44, b: 22, l: 34 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "D램 현물가 추이(지수)" }, box);
+  const all = ser.flatMap(s => s.pts.map(p => p.i)), ticks = niceTicks(Math.min(...all), Math.max(...all), 4);
+  const X = t => m.l + (W - m.l - m.r) * (t - t0) / (+end - t0);
+  const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks.at(-1) - ticks[0]));
+  grid(svg, ticks, Y, m.l, W - m.r);
+  ser.forEach(s => {
+    el("path", { d: s.pts.map((p, i) => `${i ? "L" : "M"}${X(p.t)},${Y(p.i)}`).join(""), fill: "none", stroke: css(s.c), "stroke-width": 2.2, "stroke-linejoin": "round" }, svg);
+    const L = s.pts.at(-1); el("circle", { cx: X(L.t), cy: Y(L.i), r: 3.5, fill: css(s.c), stroke: css("--bg"), "stroke-width": 1.5 }, svg);
+  });
+  for (let d = new Date(new Date(t0).getFullYear(), new Date(t0).getMonth() + 1, 1); +d <= +end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1))
+    if (d.getMonth() % 2 === 0) txt(svg, X(+d), H - 6, `${d.getMonth() + 1}월`, { "text-anchor": "middle" });
+  // 표: 품목별 최신가·1주·1개월
+  const tb = $("#spot-tbl"); tb.replaceChildren();
+  tb.appendChild(smallTable(["품목", "현물가($)", "1주", "1개월"], S.signal.map(x => [x.label, x.last.toFixed(2),
+    x.d7 == null ? "–" : fmt(x.d7, 1) + "%", x.d30 == null ? "–" : fmt(x.d30, 1) + "%"])));
+  const last = S.signal.map(x => x.date).sort().at(-1);
+  $("#spot-note").textContent = `그래프 = 품목별 최신값 100 기준 지수(100보다 위 = 지금보다 비쌌던 때) · ${last} 기준 · 출처: ${S.src} · ` +
+    "현물가는 유통시장 시세로 대형 고객 계약가(한은 수출물가에 반영)보다 1~3개월 먼저 움직임 → 모형 계산엔 넣지 않고 경고용으로만 표시";
+}
+
 // ================================================================ 품목별 수출액: 연간 누적 영역
 function renderExports() {
   const X0 = DATA.exports, sec = $("#xi-sec");
@@ -1244,6 +1295,10 @@ function renderMethod() {
     DATA.bop && ["부가: 경상수지", [
       "IMF 주요국 경상수지(한국·중국·독일·일본, 분기) + 한국 월별 국제수지, 한은 ECOS 수록 자료",
       "통계표 번호는 고정하지 않고 실행 때 이름으로 찾음 → 표 번호가 바뀌어도 자동 추적"]],
+    DATA.dram_spot && ["선행 경고: D램 현물가", [
+      "트렌드포스(DRAMeXchange) DRAM 현물 세션 평균가를 매 실행 수집 → data/dram_spot.csv (DDR5 16Gb·DDR4 16Gb·DDR4 8Gb)",
+      "판정: 품목 중 1개월(28일) 변화가 가장 나쁜 값 기준 → −3% 이하 경고, 0% 미만 또는 1주 −1.5% 이하 주의, +3% 이상 상승, 그 외 보합",
+      "모형 계산엔 안 넣음 → 현물이 꺾이면 1~3개월 뒤 계약가·한은 수출물가가 둔화할 수 있다는 신호로만 사용"]],
     DATA.exports && ["부가: 품목별 수출액", [
       "관세청 품목별 수출입실적(공공데이터포털 API, 매월 15일경 전월 확정치) → 품목군 = HS 코드 묶음, 전체 = HS 2단위 류 합",
       DATA.exports.groups.filter(g => DATA.exports.hs[g.k]).map(g => `${g.label} ${hsTxt(DATA.exports.hs[g.k])}`).join(" / ") + " / 기타 = 전체 − 합",
@@ -1466,7 +1521,7 @@ function openChange(pts, i) {
 }
 document.addEventListener("click", e => { const d = $("#chgdlg"); if (d && e.target === d) d.close(); });
 
-function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderExports(); renderGNI(); renderBop(); renderDist(); renderLabor(); renderExp(); renderCal(); renderBT(); renderMethod(); }
+function renderAll() { renderHead(); renderEvo(); renderYoY(); renderQuarter(); renderChip(); renderSpot(); renderExports(); renderGNI(); renderBop(); renderDist(); renderLabor(); renderExp(); renderCal(); renderBT(); renderMethod(); }
 if (DATA) {
   $("#badge").textContent = kst(DATA.generated_at, { year: "numeric", month: "long", day: "numeric" }) + " 업데이트";
   $("#lede").textContent = `${DATA.annual ? DATA.annual.year : new Date().getFullYear()}년 경제성장률 실시간 추정(비공식)`;

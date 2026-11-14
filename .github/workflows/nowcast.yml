@@ -55,6 +55,12 @@ jobs:
         timeout-minutes: 6
         run: python -m nowcast.customs_scrape
 
+      # D램 현물가(트렌드포스) → data/dram_spot.csv, 선행 경고 지표용 (실패해도 계속)
+      - name: Collect DRAM spot
+        continue-on-error: true
+        timeout-minutes: 3
+        run: python -m nowcast.dram_spot
+
       - name: Run nowcast
         env:
           ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}

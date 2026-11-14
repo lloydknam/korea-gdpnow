@@ -1,0 +1,35 @@
+# D램 현물 세션 평균가(달러/개). 자동 수집: nowcast/dram_spot.py (트렌드포스 DRAM Spot Price 표)
+# 초기값: DDR4 8Gb 2025-11~2026-11-03은 capitalandcompute.net 정리본(원자료 TrendForce·DRAMeXchange),
+#         2026-11-05는 TrendForce 인용 보도, 2026-11-13은 트렌드포스 표
+date,item,avg,src
+2025-11-12,ddr4_8g,12.18,capitalandcompute
+2025-11-18,ddr4_8g,12.76,capitalandcompute
+2025-12-03,ddr4_8g,16.73,capitalandcompute
+2025-12-09,ddr4_8g,17.06,capitalandcompute
+2026-04-21,ddr4_8g,33.0,dramexchange
+2026-04-28,ddr4_8g,32.5,capitalandcompute
+2026-05-05,ddr4_8g,32.4,capitalandcompute
+2026-06-03,ddr4_8g,34.8,capitalandcompute
+2026-06-09,ddr4_8g,35.9,capitalandcompute
+2026-06-30,ddr4_8g,36.0,capitalandcompute
+2026-07-07,ddr4_8g,37.14,capitalandcompute
+2026-07-15,ddr4_8g,39.8,capitalandcompute
+2026-07-21,ddr4_8g,41.1,capitalandcompute
+2026-08-07,ddr4_8g,42.45,capitalandcompute
+2026-08-10,ddr4_8g,42.5,capitalandcompute
+2026-08-26,ddr4_8g,43.64,capitalandcompute
+2026-09-01,ddr4_8g,44.54,capitalandcompute
+2026-09-11,ddr4_8g,45.21,capitalandcompute
+2026-09-16,ddr4_8g,45.79,capitalandcompute
+2026-09-24,ddr4_8g,46.11,capitalandcompute
+2026-10-06,ddr4_8g,46.32,capitalandcompute
+2026-10-08,ddr4_8g,46.4,capitalandcompute
+2026-10-15,ddr4_8g,45.97,capitalandcompute
+2026-10-26,ddr4_8g,47.0,capitalandcompute
+2026-11-03,ddr4_8g,46.82,capitalandcompute
+2026-11-05,ddr5_16g,60.667,trendforce-news
+2026-11-05,ddr4_16g,81.679,trendforce-news
+2026-11-05,ddr4_8g,46.036,trendforce-news
+2026-11-13,ddr5_16g,60.267,trendforce
+2026-11-13,ddr4_16g,79.5,trendforce
+2026-11-13,ddr4_8g,44.536,trendforce

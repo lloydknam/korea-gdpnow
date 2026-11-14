@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from . import adjust, bop, ecos, exports_items, extras, model, releases
+from . import adjust, bop, dram_spot, ecos, exports_items, extras, model, releases
 
 ROOT = Path(__file__).resolve().parent.parent
 KST = timezone(timedelta(hours=9))
@@ -525,6 +525,15 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
                   f" → 물량 {c['vol']:+.1f}%")
     except Exception as e:  # noqa: BLE001
         print(f"::warning::반도체 속보 추정 생략 — {type(e).__name__} {e}")
+    # D램 현물가 선행 경고(모형 계산엔 안 씀)
+    spot = None
+    try:
+        tr = next((c.get("px_trend") for c in reversed(chips) if c.get("est") and c.get("px_trend") is not None), None)
+        spot = dram_spot.section(data_dir, tr)
+        if spot:
+            print(f"::notice::D램 현물 신호[{spot['level']}]: {spot['text']}")
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::D램 현물가 생략 — {type(e).__name__} {e}")
 
     # 6) 부가 분석 ❹ 실질 GNI ❺ 분배 ❻ 지출 측 — 실패해도 본 추정은 그대로
     ext = {"gni": None, "dist": None, "labor": None, "bop": None, "exp": None, "exports": None, "errors": []}
@@ -601,6 +610,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         "actuals": [{"q": q, **v} for q, v in sorted(state["actuals"].items())][-8:],
         "customs": customs_used,
         "chips": chips,
+        "dram_spot": spot,
         "esi": {"last": str(esi.index.max()), "value": r(esi.iloc[-1], 1)},
         "gni": ext["gni"], "dist": ext["dist"], "labor": ext["labor"], "bop": ext["bop"], "expenditure": ext["exp"],
         "exports": ext["exports"],
