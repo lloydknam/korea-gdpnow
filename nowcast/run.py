@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from . import adjust, bop, dram_spot, ecos, exports_items, extras, model, releases
+from . import adjust, bop, dram_spot, ecos, exports_items, extras, model, percap, releases
 
 ROOT = Path(__file__).resolve().parent.parent
 KST = timezone(timedelta(hours=9))
@@ -536,7 +536,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         print(f"::warning::D램 현물가 생략 — {type(e).__name__} {e}")
 
     # 6) 부가 분석 ❹ 실질 GNI ❺ 분배 ❻ 지출 측 — 실패해도 본 추정은 그대로
-    ext = {"gni": None, "dist": None, "labor": None, "bop": None, "exp": None, "exports": None, "errors": []}
+    ext = {"gni": None, "dist": None, "labor": None, "bop": None, "exp": None, "exports": None, "percap": None, "errors": []}
     if "extras" in cfg:
         xr = extras.collect(cfg, fetcher, f"{now.year}Q4", f"{now.year}{now.month:02d}")
         ext["errors"] = xr.pop("_errors", [])
@@ -550,6 +550,9 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
                          ("dist", lambda: extras.dist_section(xr)),
                          ("labor", lambda: extras.labor_section(xr, annual)),
                          ("bop", lambda: bop.section(os.environ.get("ECOS_API_KEY"), data_dir, now)),
+                         ("percap", lambda: annual and percap.section(
+                             os.environ.get("ECOS_API_KEY"), data_dir, now, annual["year"], annual["nominal"],
+                             annual["nom_sd"], raw.get("usdkrw"))),
                          ("exports_probe", lambda: None if os.environ.get("DATA_GO_KR_KEY") else
                           exports_items.probe_ecos(os.environ.get("ECOS_API_KEY"), data_dir, now)),
                          ("exports", lambda: exports_items.section(os.environ.get("DATA_GO_KR_KEY"), data_dir, now,
@@ -614,6 +617,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         "esi": {"last": str(esi.index.max()), "value": r(esi.iloc[-1], 1)},
         "gni": ext["gni"], "dist": ext["dist"], "labor": ext["labor"], "bop": ext["bop"], "expenditure": ext["exp"],
         "exports": ext["exports"],
+        "percap": ext["percap"],
         "releases": upcoming,
         "alerts": alerts,
     }

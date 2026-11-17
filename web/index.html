@@ -70,6 +70,8 @@ h2{font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin:0
 .h-v{font-size:46px;font-weight:800;letter-spacing:-.04em;line-height:1.05;margin:2px 0 4px;white-space:nowrap}
 .h-v small{font-size:22px;font-weight:700;margin-left:1px}
 .h-n{font-size:12.5px;color:var(--ink-2);line-height:1.4}
+.h-pc{border-top:1px solid var(--rule);margin-top:14px;padding-top:12px}
+.h-pc .h-v small{font-size:20px;margin-left:4px}
 .h-meta{font-size:13px;color:var(--ink-2);margin-top:12px;line-height:1.55}
 .h-meta b{color:var(--ink)}
 
@@ -444,6 +446,17 @@ function renderHead() {
     heads.appendChild(c);
   });
   box.appendChild(heads);
+  // 1인당 국민소득(GNI, 달러) — 명목 성장률 추정 × 환율 × 인구
+  const PC = DATA.percap;
+  if (PC) {
+    const c = h("div", "h-pc");
+    c.appendChild(h("div", "h-l", `${PC.year}년 1인당 국민소득(GNI)`));
+    const vv = h("div", "h-v", PC.usd.toLocaleString("en-US")); vv.appendChild(h("small", "", "달러")); c.appendChild(vv);
+    c.appendChild(h("div", "h-n", `범위 ${PC.lo.toLocaleString("en-US")} ~ ${PC.hi.toLocaleString("en-US")}달러`));
+    c.appendChild(h("div", "h-n", `${PC.prev_year}년 ${PC.prev_usd.toLocaleString("en-US")}달러 → ${fmt(PC.growth_usd, 1)}%`));
+    c.appendChild(h("div", "h-n", `= 명목 성장 ${fmt(PC.nominal, 1)}% · 환율 효과 ${fmt(PC.fx_effect, 1)}% · 인구 ${fmt(PC.pop_g, 2)}%`));
+    box.appendChild(c);
+  }
   const m = h("div", "h-meta");
   m.appendChild(h("b", "", `GDP 디플레이터 ${fmt(A.deflator, 1)}%`));
   m.appendChild(document.createTextNode(
@@ -1295,6 +1308,11 @@ function renderMethod() {
     DATA.bop && ["부가: 경상수지", [
       "IMF 주요국 경상수지(한국·중국·독일·일본, 분기) + 한국 월별 국제수지, 한은 ECOS 수록 자료",
       "통계표 번호는 고정하지 않고 실행 때 이름으로 찾음 → 표 번호가 바뀌어도 자동 추적"]],
+    DATA.percap && ["1인당 국민소득(GNI, 달러)", [
+      "당해 = 전년 실적(달러) × (1 + 명목 성장률 추정) ÷ (1 + 인구 증가율) × (전년 평균환율 ÷ 당해 평균환율)",
+      "명목 GNI 증가율 ≈ 명목 GDP 증가율 (국외순수취요소소득 비중은 전년과 같다고 가정)",
+      "환율: 원/달러 매매기준율 일별 평균, 당해 남은 영업일은 최근 5영업일 평균 유지 · 전년 실적·추계인구: 한은 ECOS 주요지표(연간)",
+      "범위 = 명목 성장률 오차범위만 반영(환율 변동은 미반영)"]],
     DATA.dram_spot && ["선행 경고: D램 현물가", [
       "트렌드포스(DRAMeXchange) DRAM 현물 세션 평균가를 매 실행 수집 → data/dram_spot.csv (DDR5 16Gb·DDR4 16Gb·DDR4 8Gb)",
       "판정: 품목 중 1개월(28일) 변화가 가장 나쁜 값 기준 → −3% 이하 경고, 0% 미만 또는 1주 −1.5% 이하 주의, +3% 이상 상승, 그 외 보합",
