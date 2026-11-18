@@ -102,7 +102,7 @@ def section(key: str | None, data_dir: Path, now: datetime, year: int, nominal: 
                 return None
             path.write_text(json.dumps(codes, ensure_ascii=False, indent=1))
         try:
-            data = {k: _annual(e, codes["stat"], codes[k], year - 6, year) for k in ("usd", "krw", "pop") if codes.get(k)}
+            data = {k: _annual(e, codes["stat"], codes[k], year - 21, year) for k in ("usd", "krw", "pop") if codes.get(k)}
         except Exception:  # noqa: BLE001
             data = {}
         if data.get("usd"):

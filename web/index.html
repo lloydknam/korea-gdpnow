@@ -480,6 +480,70 @@ function renderHead() {
   });
   d.appendChild(t); d.appendChild(h("p", "note", "* 실시간 추정치(파란 글씨). 나머지는 한은 발표치."));
   box.appendChild(d);
+  // 1인당 국민소득 20년 비교 (펼칠 때 그림 — 닫힌 상태에선 폭이 0)
+  if (DATA.percap || DATA.world_gni) {
+    const d2 = h("details"); d2.appendChild(h("summary", "", "1인당 국민소득 20년 비교 (달러 · 한국·일본·중국·미국)"));
+    const cb = h("div", "chart"); cb.id = "c-pcw"; d2.appendChild(cb);
+    const nt = h("p", "note"); d2.appendChild(nt);
+    d2.addEventListener("toggle", () => { if (d2.open) renderPcWorld(cb, nt); });
+    box.appendChild(d2);
+  }
+}
+
+function renderPcWorld(box, note) {
+  box.replaceChildren();
+  const PC = DATA.percap, WG = (DATA.world_gni || {}).countries || {};
+  const S = [];
+  const kr = PC && PC.hist && PC.hist.length ? PC.hist.map(p => ({ y: p.y, v: p.usd }))
+    : (WG.KOR ? WG.KOR.pts : []);
+  if (kr.length) S.push({ k: "KOR", name: "한국", c: css("--main"), w: 3.4, pts: kr, est: PC ? { y: PC.year, v: PC.usd } : null });
+  [["USA", "--s2"], ["JPN", "--s3"], ["CHN", "--s4"]].forEach(([k, c]) => { if (WG[k]) S.push({ k, name: WG[k].name, c: css(c), w: 1.8, pts: WG[k].pts }); });
+  if (!S.length) return;
+  const yEnd = Math.max(...S.flatMap(s => [...s.pts.map(p => p.y), s.est ? s.est.y : 0])), yStart = yEnd - 20;
+  S.forEach(s => { s.pts = s.pts.filter(p => p.y >= yStart); });
+  const W = box.clientWidth || 340, H = 240, m = { t: 12, r: 70, b: 22, l: 36 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "1인당 국민소득 20년 비교" }, box);
+  const vmax = Math.max(...S.flatMap(s => [...s.pts.map(p => p.v), s.est ? s.est.v : 0]));
+  const ticks = niceTicks(0, vmax, 4);
+  const X = y => m.l + (W - m.l - m.r) * (y - yStart) / (yEnd - yStart);
+  const Y = v => m.t + (H - m.t - m.b) * (1 - v / ticks.at(-1));
+  ticks.forEach(tk => { el("line", { x1: m.l, x2: W - m.r, y1: Y(tk), y2: Y(tk), stroke: css(tk ? "--grid" : "--axis") }, svg);
+    txt(svg, m.l - 6, Y(tk) + 3.5, tk ? (tk / 1e4).toFixed(tk % 1e4 ? 1 : 0) + "만" : "0", { "text-anchor": "end" }); });
+  for (let y = yStart; y <= yEnd; y += 5) txt(svg, X(y), H - 6, String(y), { "text-anchor": "middle" });
+  // 한국을 맨 위에 그리도록 마지막에
+  const order = [...S.filter(s => s.k !== "KOR"), ...S.filter(s => s.k === "KOR")];
+  const labs = [];
+  order.forEach(s => {
+    el("path", { d: s.pts.map((p, i) => `${i ? "L" : "M"}${X(p.y)},${Y(p.v)}`).join(""), fill: "none", stroke: s.c, "stroke-width": s.w,
+      "stroke-linejoin": "round", "stroke-linecap": "round", opacity: s.k === "KOR" ? 1 : .85 }, svg);
+    let L = s.pts.at(-1);
+    if (s.est && s.est.y > L.y) {   // 한국 당해 추정: 점선 + 속 빈 점
+      el("path", { d: `M${X(L.y)},${Y(L.v)}L${X(s.est.y)},${Y(s.est.v)}`, stroke: s.c, "stroke-width": 2.4, "stroke-dasharray": "4 3", fill: "none" }, svg);
+      el("circle", { cx: X(s.est.y), cy: Y(s.est.v), r: 4.5, fill: css("--bg"), stroke: s.c, "stroke-width": 2.2 }, svg);
+      L = s.est;
+    } else el("circle", { cx: X(L.y), cy: Y(L.v), r: s.k === "KOR" ? 4 : 3, fill: s.c }, svg);
+    labs.push({ s, x: X(L.y), y: Y(L.v), t: `${s.name} ${(L.v / 1e4).toFixed(1)}만${s.est && L === s.est ? "*" : ""}` });
+  });
+  // 끝 라벨 겹침 방지
+  labs.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < labs.length; i++) if (labs[i].y - labs[i - 1].y < 13) labs[i].y = labs[i - 1].y + 13;
+  labs.forEach(l => txt(svg, Math.max(...labs.map(z => z.x)) + 9, l.y + 4, l.t,
+    { style: `fill:${l.s.c}`, "font-weight": l.s.k === "KOR" ? 800 : 600, "font-size": l.s.k === "KOR" ? 12 : 11 }));
+  // 툴팁
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), opacity: 0 }, svg), tip = tipFor(box);
+  const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
+  hit.addEventListener("pointermove", e => {
+    const { sx, k } = svgPt(svg, W, e), y = Math.round(yStart + (sx - m.l) / (W - m.l - m.r) * (yEnd - yStart));
+    cross.setAttribute("x1", X(y)); cross.setAttribute("x2", X(y)); cross.setAttribute("opacity", 1);
+    const ls = [{ v: `${y}년` }];
+    S.forEach(s => { const p = s.pts.find(q => q.y === y) || (s.est && s.est.y === y ? s.est : null);
+      if (p) ls.push({ v: p.v.toLocaleString("en-US") + "달러" + (s.est && p === s.est ? " (추정)" : ""), k: s.name, key: s.c, strong: s.k === "KOR" }); });
+    tip.show(ls, X(y) * k, (m.t + 20) * k);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); tip.hide(); });
+  note.textContent = "한국 = 한은(원화 GNI ÷ 연평균 환율 ÷ 인구)" + (PC ? `, ${PC.year}년*은 이 모형 추정` : "") +
+    " · 미국·일본·중국 = 세계은행(경상 달러 GNI ÷ 인구, Atlas 방식 아님) · 단위 만 달러" +
+    (Object.keys(WG).length ? "" : " · 다른 나라 자료는 다음 갱신 때 들어옴");
 }
 
 // ================================================================ MCT 스타일 장기 차트
