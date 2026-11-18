@@ -451,9 +451,9 @@ function renderHead() {
   if (PC) {
     const c = h("div", "h-pc");
     c.appendChild(h("div", "h-l", `${PC.year}년 1인당 국민소득(GNI)`));
+    c.appendChild(h("div", "h-n", `${PC.prev_year}년 ${PC.prev_usd.toLocaleString("en-US")}달러 → ${fmt(PC.growth_usd, 1)}%`));
     const vv = h("div", "h-v", PC.usd.toLocaleString("en-US")); vv.appendChild(h("small", "", "달러")); c.appendChild(vv);
     c.appendChild(h("div", "h-n", `범위 ${PC.lo.toLocaleString("en-US")} ~ ${PC.hi.toLocaleString("en-US")}달러`));
-    c.appendChild(h("div", "h-n", `${PC.prev_year}년 ${PC.prev_usd.toLocaleString("en-US")}달러 → ${fmt(PC.growth_usd, 1)}%`));
     c.appendChild(h("div", "h-n", `= 명목 성장 ${fmt(PC.nominal, 1)}% · 환율 효과 ${fmt(PC.fx_effect, 1)}% · 인구 ${fmt(PC.pop_g, 2)}%`));
     box.appendChild(c);
   }
