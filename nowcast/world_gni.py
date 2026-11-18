@@ -90,7 +90,7 @@ def imf_forecast(sess, year: int) -> dict[str, dict]:
             if g_prev is None or g_cur is None:
                 continue
             out[c] = {"y": year, "g": float(g_cur) / float(g_prev), "gdp_pc": float(g_cur)}
-        except (requests.RequestException, ValueError, KeyError, TypeError) as e:
+        except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError) as e:
             print(f"::notice::IMF 1인당 GDP 전망 조회 실패({c}) — {type(e).__name__}, 전망 점 생략")
     return out
 

@@ -40,12 +40,12 @@ def test():
     d = Path(tempfile.mkdtemp())
     s = S()
     o = wg.section(d, datetime(2026, 11, 18), sess=s)
-    assert s.calls == 8 and set(o["countries"]) == {"JPN", "CHN", "USA", "KOR"}, o
+    assert s.calls == 11 and set(o["countries"]) == {"JPN", "CHN", "USA", "KOR"}, o
     us = o["countries"]["USA"]["pts"]
     assert us[0]["y"] == 2005 and us[-1]["y"] == 2025 and abs(us[0]["v"] - 2.9e13 / 3.4e8) < 1, us[:2]
     s2 = S()
     wg.section(d, datetime(2026, 11, 20), sess=s2)
-    assert s2.calls == 0                      # 7일 안엔 다시 안 받음
+    assert s2.calls == 3                      # 세계은행은 7일 안 다시 받음, IMF 전망 3회만
     print("world_gni OK")
 
 
