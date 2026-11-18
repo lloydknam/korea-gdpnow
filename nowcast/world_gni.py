@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -19,15 +20,29 @@ IND = {"gni": "NY.GNP.MKTP.CD", "pop": "SP.POP.TOTL"}
 REFRESH_DAYS = 7
 
 
+def _get(sess, url: str, params: dict, tries: int = 2):
+    """세계은행 API는 가끔 매우 느림 → 나라별 작은 요청 + 넉넉한 시간 + 재시도."""
+    last = None
+    for k in range(tries):
+        try:
+            r = sess.get(url, params=params, timeout=(10, 60))
+            r.raise_for_status()
+            js = r.json()
+            if not isinstance(js, list) or len(js) < 2 or not js[1]:
+                raise ValueError(f"세계은행 응답 형식 이상: {str(js)[:120]}")
+            return js[1]
+        except (requests.RequestException, ValueError) as e:
+            last = e
+            time.sleep(3 * (k + 1))
+    raise last
+
+
 def _fetch(sess, ind: str, y0: int, y1: int) -> dict[tuple[str, int], float]:
-    r = sess.get(URL.format(c=";".join(COUNTRIES), i=ind),
-                 params={"date": f"{y0}:{y1}", "format": "json", "per_page": 1000}, timeout=40)
-    r.raise_for_status()
-    js = r.json()
-    if not isinstance(js, list) or len(js) < 2 or not js[1]:
-        raise ValueError(f"세계은행 응답 형식 이상: {str(js)[:120]}")
+    rows = []
+    for c in COUNTRIES:
+        rows += _get(sess, URL.format(c=c, i=ind), {"date": f"{y0}:{y1}", "format": "json", "per_page": 100})
     out = {}
-    for row in js[1]:
+    for row in rows:
         v, c = row.get("value"), row.get("countryiso3code") or (row.get("country") or {}).get("id")
         if v is not None and c in COUNTRIES:
             out[(c, int(row["date"]))] = float(v)

@@ -30,8 +30,9 @@ class S:
         self.calls += 1
         src = GNI if "NY.GNP" in url else POP
         y0, y1 = map(int, params["date"].split(":"))
+        cs = url.split("/country/")[1].split("/")[0].split(";")
         rows = [{"countryiso3code": c, "date": str(y), "value": v * (1 + 0.03 * (y - 2005)) if y < 2026 else None}
-                for c, v in src.items() for y in range(y0, y1 + 1)]
+                for c, v in src.items() if c in cs for y in range(y0, y1 + 1)]
         return R([{"page": 1}, rows])
 
 
@@ -39,7 +40,7 @@ def test():
     d = Path(tempfile.mkdtemp())
     s = S()
     o = wg.section(d, datetime(2026, 11, 18), sess=s)
-    assert s.calls == 2 and set(o["countries"]) == {"JPN", "CHN", "USA", "KOR"}, o
+    assert s.calls == 8 and set(o["countries"]) == {"JPN", "CHN", "USA", "KOR"}, o
     us = o["countries"]["USA"]["pts"]
     assert us[0]["y"] == 2005 and us[-1]["y"] == 2025 and abs(us[0]["v"] - 2.9e13 / 3.4e8) < 1, us[:2]
     s2 = S()
