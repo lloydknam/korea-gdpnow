@@ -519,7 +519,8 @@ function renderPcWorld(box, note) {
   const kr = PC && PC.hist && PC.hist.length ? PC.hist.map(p => ({ y: p.y, v: p.usd }))
     : (WG.KOR ? WG.KOR.pts : []);
   if (kr.length) S.push({ k: "KOR", name: "한국", c: css("--main"), w: 3.4, pts: kr, est: PC ? { y: PC.year, v: PC.usd } : null });
-  [["USA", "--s2"], ["JPN", "--s3"], ["CHN", "--s4"]].forEach(([k, c]) => { if (WG[k]) S.push({ k, name: WG[k].name, c: css(c), w: 1.8, pts: WG[k].pts }); });
+  const WF = (DATA.world_gni || {}).forecast || {};
+  [["USA", "--s2"], ["JPN", "--s3"], ["CHN", "--s4"]].forEach(([k, c]) => { if (WG[k]) S.push({ k, name: WG[k].name, c: css(c), w: 1.8, pts: WG[k].pts, est: WF[k] || null }); });
   if (!S.length) return;
   const yEnd = Math.max(...S.flatMap(s => [...s.pts.map(p => p.y), s.est ? s.est.y : 0])), yStart = yEnd - 20;
   S.forEach(s => { s.pts = s.pts.filter(p => p.y >= yStart); });
@@ -584,7 +585,9 @@ function renderPcWorld(box, note) {
   }
   box.appendChild(tb);
   note.textContent = "단위 달러 · 한국 = 한은(원화 GNI ÷ 연평균 환율 ÷ 인구)" + (PC ? `, ${PC.year}년*은 이 모형 추정` : "") +
-    " · 미국·일본·중국 = 세계은행(경상 달러 GNI ÷ 인구, Atlas 방식 아님) · 그래프 눈금 단위 만 달러" +
+    " · 미국·일본·중국 = 세계은행(경상 달러 GNI ÷ 인구, Atlas 방식 아님)" +
+    (Object.keys(WF).length ? ` · ${Object.values(WF)[0].y}년* 미국·일본·중국은 IMF 1인당 GDP 전망 증가율을 전년 실적에 적용한 추정` : "") +
+    " · 그래프 눈금 단위 만 달러" +
     (Object.keys(WG).length ? "" : " · 다른 나라 자료는 다음 갱신 때 들어옴");
 }
 

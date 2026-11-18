@@ -72,8 +72,32 @@ def update(path: Path, now: datetime, y0: int, sess=None) -> pd.DataFrame:
     return df
 
 
+IMF_URL = "https://www.imf.org/external/datamapper/api/v1/NGDPDPC/{c}"   # 1인당 GDP(현재가 달러), 전망치 포함
+FC_CODES = ["JPN", "CHN", "USA"]
+
+
+def imf_forecast(sess, year: int) -> dict[str, dict]:
+    """IMF 전망(WEO) 1인당 GDP → 당해 1인당 GNI 추정.
+    GNI(당해) = GNI(전년 실적) × (GDP1인당(당해) ÷ GDP1인당(전년))  — 달러 기준 증가율을 그대로 적용.
+    실패하면 빈 dict (그래프에 전망 점이 안 나옴, 나머지는 그대로)."""
+    out = {}
+    for c in FC_CODES:
+        try:
+            r = sess.get(IMF_URL.format(c=c), timeout=(10, 40))
+            r.raise_for_status()
+            vals = (r.json().get("values") or {}).get("NGDPDPC", {}).get(c, {})
+            g_prev, g_cur = vals.get(str(year - 1)), vals.get(str(year))
+            if g_prev is None or g_cur is None:
+                continue
+            out[c] = {"y": year, "g": float(g_cur) / float(g_prev), "gdp_pc": float(g_cur)}
+        except (requests.RequestException, ValueError, KeyError, TypeError) as e:
+            print(f"::notice::IMF 1인당 GDP 전망 조회 실패({c}) — {type(e).__name__}, 전망 점 생략")
+    return out
+
+
 def section(data_dir: Path, now: datetime, years: int = 21, sess=None) -> dict | None:
     y0 = now.year - years
+    sess = sess or requests.Session()
     df = update(data_dir / "world_gni.csv", now, y0, sess)
     if df.empty:
         return None
@@ -83,4 +107,16 @@ def section(data_dir: Path, now: datetime, years: int = 21, sess=None) -> dict |
         d = df[df["country"] == c].sort_values("year")
         if not d.empty:
             out[c] = {"name": name, "pts": [{"y": int(r.year), "v": round(r.gni_usd / r.pop)} for r in d.itertuples()]}
-    return {"countries": out, "src": "세계은행 WDI (GNI 경상 달러 ÷ 인구)"} if out else None
+    if not out:
+        return None
+    # 당해(now.year) 전망: 전년 실적 GNI 1인당 × IMF 1인당 GDP 증가율
+    fc = {}
+    last_year = now.year - 1
+    for c, f in imf_forecast(sess, now.year).items():
+        base = next((p["v"] for p in out.get(c, {}).get("pts", []) if p["y"] == last_year), None)
+        if base is not None:
+            fc[c] = {"y": now.year, "v": round(base * f["g"])}
+    notes = "세계은행 WDI (GNI 경상 달러 ÷ 인구)"
+    if fc:
+        notes += f" · {now.year}년 전망: IMF 1인당 GDP 증가율을 {last_year}년 실적에 적용(추정)"
+    return {"countries": out, "forecast": fc, "src": notes}
