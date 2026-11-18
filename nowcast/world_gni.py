@@ -92,6 +92,8 @@ def imf_forecast(sess, year: int) -> dict[str, dict]:
             out[c] = {"y": year, "g": float(g_cur) / float(g_prev), "gdp_pc": float(g_cur)}
         except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError) as e:
             print(f"::notice::IMF 1인당 GDP 전망 조회 실패({c}) — {type(e).__name__}, 전망 점 생략")
+    if out:
+        print("::notice::IMF 1인당 GDP 전망 " + ", ".join(f"{c} {v['gdp_pc']:,.0f}달러({v['y']}, 증가율 {(v['g']-1)*100:+.1f}%)" for c, v in out.items()))
     return out
 
 
