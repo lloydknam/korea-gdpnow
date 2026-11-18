@@ -72,6 +72,14 @@ h2{font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin:0
 .h-n{font-size:12.5px;color:var(--ink-2);line-height:1.4}
 .h-pc{border-top:1px solid var(--rule);margin-top:14px;padding-top:12px}
 .h-pc .h-v small{font-size:20px;margin-left:4px}
+.h-pcrow{display:flex;align-items:flex-end;flex-wrap:wrap;gap:4px 12px;margin:4px 0 6px}
+.h-pca .h-pcy,.h-pcb .h-pcy{font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.h-pca .h-pcv{font-size:20px;font-weight:700;color:var(--ink-2);letter-spacing:-.02em;white-space:nowrap}
+.h-pcg{display:flex;flex-direction:column;align-items:center;padding-bottom:6px}
+.h-pct{font-size:13px;font-weight:700;color:var(--main);white-space:nowrap}
+.h-pca-arrow{font-size:22px;line-height:1;color:var(--main)}
+.h-pcb .h-v{font-size:40px;margin:0}
+.h-pcb .h-v small{font-size:18px}
 .h-meta{font-size:13px;color:var(--ink-2);margin-top:12px;line-height:1.55}
 .h-meta b{color:var(--ink)}
 
@@ -450,9 +458,23 @@ function renderHead() {
   const PC = DATA.percap;
   if (PC) {
     const c = h("div", "h-pc");
-    c.appendChild(h("div", "h-l", `${PC.year}년 1인당 국민소득(GNI)`));
-    c.appendChild(h("div", "h-n", `${PC.prev_year}년 ${PC.prev_usd.toLocaleString("en-US")}달러 → ${fmt(PC.growth_usd, 1)}%`));
-    const vv = h("div", "h-v", PC.usd.toLocaleString("en-US")); vv.appendChild(h("small", "", "달러")); c.appendChild(vv);
+    c.appendChild(h("div", "h-l", "1인당 국민소득(GNI)"));
+    const row = h("div", "h-pcrow");
+    const pa = h("div", "h-pca");
+    pa.appendChild(h("div", "h-pcy", `${PC.prev_year}년`));
+    pa.appendChild(h("div", "h-pcv", PC.prev_usd.toLocaleString("en-US")));
+    row.appendChild(pa);
+    const gr = PC.growth_usd;
+    const pg = h("div", "h-pcg");
+    pg.appendChild(h("div", "h-pct", `${gr > 0 ? "+" : ""}${gr.toFixed(1)}%`));
+    pg.appendChild(h("div", "h-pca-arrow", "→"));
+    row.appendChild(pg);
+    const pb = h("div", "h-pcb");
+    pb.appendChild(h("div", "h-pcy", `${PC.year}년`));
+    const vv = h("div", "h-v", PC.usd.toLocaleString("en-US")); vv.appendChild(h("small", "", "달러"));
+    pb.appendChild(vv);
+    row.appendChild(pb);
+    c.appendChild(row);
     c.appendChild(h("div", "h-n", `범위 ${PC.lo.toLocaleString("en-US")} ~ ${PC.hi.toLocaleString("en-US")}달러`));
     c.appendChild(h("div", "h-n", `= 명목 성장 ${fmt(PC.nominal, 1)}% · 환율 효과 ${fmt(PC.fx_effect, 1)}% · 인구 ${fmt(PC.pop_g, 2)}%`));
     box.appendChild(c);
