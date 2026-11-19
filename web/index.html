@@ -293,7 +293,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
       <div class="chart" id="c-spot"></div>
       <div id="spot-tbl"></div>
       <p class="note" id="spot-note"></p>
-      <h3 class="spot-h5">DDR4 8Gb 5년 추이 (달러·로그 눈금)</h3>
+      <h3 class="spot-h5">DDR4 8Gb 10년 추이 (달러·로그 눈금)</h3>
       <div class="chart" id="c-spot5"></div>
       <p class="note" id="spot5-note"></p>
     </div>
@@ -958,12 +958,12 @@ function renderSpotLong(S) {
   if (!H5 || !(H5.contract || []).length) { box.hidden = true; nt.hidden = true; return; }
   box.hidden = false; nt.hidden = false;
   const C = H5.contract.map(p => ({ t: +new Date(p.d), v: p.v })), P = (H5.spot || []).map(p => ({ t: +new Date(p.d), v: p.v }));
-  const all = [...C, ...P], t0 = Math.min(...all.map(p => p.t)), t1 = Math.max(...all.map(p => p.t));
+  const all = [...C, ...P], t0 = Math.min(Math.min(...all.map(p => p.t)), +new Date("2016-01-01")), t1 = Math.max(...all.map(p => p.t));
   const vmin = Math.min(...all.map(p => p.v)), vmax = Math.max(...all.map(p => p.v));
   const TK = [1, 2, 5, 10, 20, 50, 100, 200].filter(v => v >= vmin * 0.7 && v <= vmax * 1.4);
   const L0 = Math.log10(TK[0]), L1 = Math.log10(TK.at(-1));
   const W = box.clientWidth || 340, H = 170, m = { t: 10, r: 14, b: 22, l: 36 };
-  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "DDR4 8Gb 5년 추이" }, box);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "DDR4 8Gb 10년 추이" }, box);
   const X = t => m.l + (W - m.l - m.r) * (t - t0) / (t1 - t0);
   const Y = v => m.t + (H - m.t - m.b) * (1 - (Math.log10(v) - L0) / (L1 - L0));
   TK.forEach(tk => { el("line", { x1: m.l, x2: W - m.r, y1: Y(tk), y2: Y(tk), stroke: css("--grid") }, svg);
@@ -976,7 +976,7 @@ function renderSpotLong(S) {
   P.forEach(p => el("circle", { cx: X(p.t), cy: Y(p.v), r: 3, fill: css("--s3") }, svg));
   const last = C.at(-1);
   el("circle", { cx: X(last.t), cy: Y(last.v), r: 3.5, fill: css("--s1"), stroke: css("--bg"), "stroke-width": 1.5 }, svg);
-  nt.textContent = `선 = 계약가(DRAMeXchange 월평균, ${H5.contract.at(-1).d.slice(0, 7)}까지) · 점 = 현물(관측된 달만) · 로그 눈금 · ` +
+  nt.textContent = `선 = 계약가(DRAMeXchange 월평균, ${H5.contract.at(-1).d.slice(0, 7)}까지, 2022년~) · 점 = 현물(관측된 달만) · 로그 눈금 · 2016~2021년은 신뢰할 월별 자료를 찾지 못해 공백 · ` +
     "출처: siliconanalysts.com 정리(TrendForce·DRAMeXchange 인용) — 자동 수집 아님, 장기 자료는 필요 시 갱신";
 }
 
