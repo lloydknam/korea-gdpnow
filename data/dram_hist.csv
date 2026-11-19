@@ -1,6 +1,5 @@
 # DDR4 8Gb 장기 시계열(달러/개). 계약가 = DRAMeXchange 월평균 고정거래가, 현물 = 월말 근사치.
 # 출처: siliconanalysts.com(TrendForce·DRAMeXchange 및 국내 언론 인용 정리). 날짜는 월 1일로 표기. 자동 수집 아님 — 필요 시 갱신.
-# 2016~2021: 신뢰할 만한 DDR4 8Gb 월별 자료를 찾지 못함(기사 수치는 PC DRAM 모듈 등 다른 제품). 2021-02 현물 4.075는 아시아경제 기사(2021.2.23) 'DDR4 8Gb 평균 4.075달러'.
 # 2025-11 현물 15.90은 기존 일별 수집(11/12·11/18 약 12~13달러)과 어긋나 제외함.
 date,item,avg,src
 2022-01-01,ddr4_8g_contract,3.41,siliconanalysts
@@ -66,4 +65,3 @@ date,item,avg,src
 2026-08-01,ddr4_8g_spot,44.37,siliconanalysts
 2026-09-01,ddr4_8g_spot,46.32,siliconanalysts
 2026-10-01,ddr4_8g_spot,46.86,siliconanalysts
-2021-02-01,ddr4_8g_spot,4.075,asiae
