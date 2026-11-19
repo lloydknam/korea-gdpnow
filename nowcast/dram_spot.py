@@ -81,7 +81,8 @@ def parse_contract(page: str) -> tuple[str | None, float | None]:
         if mm > m:          # 1월에 갱신된 12월분 등
             y -= 1
         m = mm
-    mv = re.search(r"DDR4\s*8\s*Gb\s*\(?\s*1Gx8\s*\)?(?:\s*\d{4})?\s+" + r"\s+".join([NUM] * 3), t)
+    # 계약가 품목명은 'DDR4 8Gb 1Gx8'(속도 표기 없음). 현물 표의 'DDR4 8Gb (1Gx8) 3200'과 섞이지 않게 속도 표기 붙은 것은 제외
+    mv = re.search(r"DDR4\s*8\s*Gb\s*\(?\s*1Gx8\s*\)?\s+(?!\d{4}\b)" + r"\s+".join([NUM] * 3), t)
     if not mv:
         return f"{y}-{m:02d}", None
     v = float(mv[3].replace(",", ""))   # 세션 고·저 다음 = 세션 평균
@@ -97,6 +98,10 @@ def collect_contract(path: Path = HIST, sess=None) -> str | None:
         print(f"::warning::D램 계약가 수집 실패 — {type(e).__name__} {e}")
         return None
     month, v = parse_contract(page)
+    t = re.sub(r"\s+", " ", cs._text(page).replace("|", " "))
+    i = t.find("DDR4 8Gb")
+    print(f"  · 계약가 페이지 확인: 제목 '{(re.search(r'Contract Price[^|]{0,30}', t) or [''])[0]}' · "
+          f"품목 부분 '{t[max(i, 0):max(i, 0) + 90] if i >= 0 else '없음'}'")
     if not month or v is None:
         print(f"::warning::D램 계약가 표를 못 읽음(대상 월 {month}) — 페이지 구조 확인 필요")
         return None
@@ -104,6 +109,14 @@ def collect_contract(path: Path = HIST, sess=None) -> str | None:
     key = f"{month}-01,ddr4_8g_contract,"
     row = f"{key}{v:g},trendforce"
     old = next((ln for ln in lines if ln.startswith(key)), None)
+    # 안전장치: 같은 달 기존 값과 25% 넘게, 또는 직전 달과 40% 넘게 다르면 잘못 읽은 것으로 보고 기록 안 함
+    prev = sorted((ln.split(",")[0], float(ln.split(",")[2])) for ln in lines
+                  if ",ddr4_8g_contract," in ln and ln.split(",")[0] < f"{month}-01")
+    ref = float(old.split(",")[2]) if old else (prev[-1][1] if prev else None)
+    lim = 0.25 if old else 0.40
+    if ref and abs(v / ref - 1) > lim:
+        print(f"::warning::D램 계약가 {month} {v:g}가 기준값 {ref:g}와 {abs(v / ref - 1) * 100:.0f}% 차이 → 잘못 읽었을 수 있어 기록 안 함")
+        return None
     if old == row:
         print(f"D램 계약가 {month}: DDR4 8Gb {v:g} (변화 없음)")
         return month

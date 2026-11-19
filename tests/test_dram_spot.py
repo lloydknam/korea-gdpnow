@@ -70,6 +70,9 @@ def test():
             return R(self.page)
     assert ds.collect_contract(hp, CS(C1)) == "2026-10"
     assert ds.collect_contract(hp, CS(C1.replace("(2H Oct)", "(Nov)").replace("2026-10-30", "2026-11-28").replace("27.50", "29.00"))) == "2026-11"
+    # 현물 표 줄(속도 표기 3200)은 계약가로 안 읽음, 터무니없는 값은 기록 안 함
+    assert ds.parse_contract(C1.replace("| DDR4 8Gb 1Gx8 | 35.50 | 23.50 | 27.50 |", "| DDR4 8Gb (1Gx8) 3200 | 82.00 | 24.80 | 80.00 |"))[1] is None
+    assert ds.collect_contract(hp, CS(C1.replace("27.50", "80.00"))) is None
     lt = ds.long_term(hp)
     cm = {x["d"]: x["v"] for x in lt["contract"]}
     assert cm == {"2026-09-01": 26.0, "2026-10-01": 27.5, "2026-11-01": 29.0} and lt["auto_from"] == "2026-10", lt
