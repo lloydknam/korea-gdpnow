@@ -49,17 +49,71 @@ def parse(page: str) -> tuple[str | None, dict[str, float]]:
     return day, out
 
 
-def fetch(sess) -> str:
+def fetch(sess, url: str = URL) -> str:
     """직접 → (막히거나 403이면) 공개 웹 리더 경유."""
     try:
-        r = sess.get(URL, headers=cs.UA, timeout=(8, 30))
+        r = sess.get(url, headers=cs.UA, timeout=(8, 30))
         r.raise_for_status()
-        if "Session Average" in r.text or "DDR5" in r.text:
+        if "Session Average" in r.text or "DDR5" in r.text or "DDR4" in r.text:
             return r.text
     except requests.RequestException as e:
         print(f"  · 트렌드포스 직접 접속 실패({type(e).__name__}) → 웹 리더 경유")
     cs._route["mode"] = 0
-    return cs._get(sess, URL).text
+    return cs._get(sess, url).text
+
+
+# ------------------------------------------------------------------ 계약가(월) — 장기 그래프용, data/dram_hist.csv에 자동 추가
+CONTRACT_URL = "https://www.trendforce.com/price/dram/dram_contract"
+HIST = ROOT / "data" / "dram_hist.csv"
+MON = {m: i for i, m in enumerate(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
+
+
+def parse_contract(page: str) -> tuple[str | None, float | None]:
+    """계약가 표 → (대상 월 YYYY-MM, DDR4 8Gb 1Gx8 세션 평균). 표 제목 '(2H Sep)'·'(Oct)'의 달, 없으면 갱신일의 달."""
+    t = re.sub(r"\s+", " ", cs._text(page).replace("|", " "))
+    up = re.search(r"Last Update\s*(\d{4})-(\d{2})-(\d{2})", t)
+    if not up:
+        return None, None
+    y, m = int(up[1]), int(up[2])
+    lab = re.search(r"Contract Price\s*\(\s*(?:[12]H\s*)?([A-Z][a-z]{2})[a-z]*\.?\s*\)", t)
+    if lab and lab[1] in MON:
+        mm = MON[lab[1]]
+        if mm > m:          # 1월에 갱신된 12월분 등
+            y -= 1
+        m = mm
+    mv = re.search(r"DDR4\s*8\s*Gb\s*\(?\s*1Gx8\s*\)?(?:\s*\d{4})?\s+" + r"\s+".join([NUM] * 3), t)
+    if not mv:
+        return f"{y}-{m:02d}", None
+    v = float(mv[3].replace(",", ""))   # 세션 고·저 다음 = 세션 평균
+    return f"{y}-{m:02d}", (v if 0.3 < v < 1000 else None)
+
+
+def collect_contract(path: Path = HIST, sess=None) -> str | None:
+    """계약가 표에서 DDR4 8Gb 월 계약가를 읽어 dram_hist.csv에 추가·갱신(같은 달이면 최신 값으로 교체)."""
+    sess = sess or requests.Session()
+    try:
+        page = fetch(sess, CONTRACT_URL)
+    except requests.RequestException as e:
+        print(f"::warning::D램 계약가 수집 실패 — {type(e).__name__} {e}")
+        return None
+    month, v = parse_contract(page)
+    if not month or v is None:
+        print(f"::warning::D램 계약가 표를 못 읽음(대상 월 {month}) — 페이지 구조 확인 필요")
+        return None
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else ["date,item,avg,src"]
+    key = f"{month}-01,ddr4_8g_contract,"
+    row = f"{key}{v:g},trendforce"
+    old = next((ln for ln in lines if ln.startswith(key)), None)
+    if old == row:
+        print(f"D램 계약가 {month}: DDR4 8Gb {v:g} (변화 없음)")
+        return month
+    lines = [ln for ln in lines if not ln.startswith(key)] + [row]
+    head = [ln for ln in lines if ln.startswith("#") or ln.startswith("date,")]
+    body = sorted((ln for ln in lines if ln and not (ln.startswith("#") or ln.startswith("date,"))),
+                  key=lambda ln: (ln.split(",")[1], ln.split(",")[0]))
+    path.write_text("\n".join(head + body) + "\n", encoding="utf-8")
+    print(f"D램 계약가 {month}: DDR4 8Gb {v:g}" + (f" (기존 {old.split(',')[2]} → 교체)" if old else " (신규)"))
+    return month
 
 
 def load(path: Path = CSV) -> pd.DataFrame:
@@ -140,8 +194,8 @@ def section(data_dir: Path, chip_trend: float | None = None) -> dict | None:
             "src": "TrendForce·DRAMeXchange 현물 세션 평균가(달러/개)"}
 
 
-def long_term(path: Path = ROOT / "data" / "dram_hist.csv") -> dict | None:
-    """DDR4 8Gb 장기 시계열(월): 계약가(월평균) · 현물(드문드문). 자동 수집이 아니라 정리본 CSV."""
+def long_term(path: Path = HIST, spot_path: Path | None = None) -> dict | None:
+    """DDR4 8Gb 장기 시계열(월): 계약가(월평균, 트렌드포스 계약가 표 자동 추가) · 현물(정리본 + 일별 수집의 월말 값)."""
     if not path.exists():
         return None
     df = pd.read_csv(path, comment="#", dtype={"date": str, "item": str})
@@ -150,12 +204,25 @@ def long_term(path: Path = ROOT / "data" / "dram_hist.csv") -> dict | None:
     out = {}
     for item, key in (("ddr4_8g_contract", "contract"), ("ddr4_8g_spot", "spot")):
         d = df[df["item"] == item].sort_values("date")
-        out[key] = [{"d": r.date, "v": round(float(r.avg), 3)} for r in d.itertuples()]
+        out[key] = [{"d": r.date, "v": round(float(r.avg), 3), "src": r.src} for r in d.itertuples()]
+    # 현물: 일별 수집 자료가 있는 달은 그 달 마지막 관측값(정리본에 없는 달만)
+    sp = load(spot_path or (path.parent / "dram_spot.csv"))
+    sp = sp[sp["item"] == "ddr4_8g"] if not sp.empty else sp
+    if not sp.empty:
+        have = {x["d"][:7] for x in out["spot"]}
+        sp = sp.assign(m=sp["date"].str[:7]).sort_values("date")
+        for m, g in sp.groupby("m"):
+            if m not in have:
+                out["spot"].append({"d": f"{m}-01", "v": round(float(g["avg"].iloc[-1]), 3), "src": "daily"})
+        out["spot"].sort(key=lambda x: x["d"])
+    auto = [x["d"][:7] for x in out["contract"] if x["src"] == "trendforce"]
+    out["auto_from"] = min(auto) if auto else None
     return out if out["contract"] or out["spot"] else None
 
 
 def main(argv=None) -> int:
     collect()
+    collect_contract()
     return 0
 
 

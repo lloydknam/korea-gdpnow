@@ -990,8 +990,9 @@ function renderSpotLong(S) {
   P.forEach(p => el("circle", { cx: X(p.t), cy: Y(p.v), r: 3, fill: css("--s3") }, svg));
   const last = C.at(-1);
   el("circle", { cx: X(last.t), cy: Y(last.v), r: 3.5, fill: css("--s1"), stroke: css("--bg"), "stroke-width": 1.5 }, svg);
-  nt.textContent = `선 = 계약가(DRAMeXchange 월평균, ${H5.contract.at(-1).d.slice(0, 7)}까지) · 점 = 현물(관측된 달만) · 로그 눈금 · ` +
-    "출처: siliconanalysts.com 정리(TrendForce·DRAMeXchange 인용) — 자동 수집 아님, 장기 자료는 필요 시 갱신";
+  nt.textContent = `선 = 계약가(DRAMeXchange 월평균, ${H5.contract.at(-1).d.slice(0, 7)}까지) · 점 = 현물(달마다 마지막 관측값) · 로그 눈금 · ` +
+    "자동 수집: 계약가는 TrendForce 계약가 표를 매일 확인해 새 달이 나오면 추가, 현물은 매일 수집값" +
+    (H5.auto_from ? ` (계약가 자동분 ${H5.auto_from}~)` : "") + " · 그 이전은 siliconanalysts.com 정리본(TrendForce·DRAMeXchange 인용)";
 }
 
 // ================================================================ 품목별 수출액: 연간 누적 영역

@@ -50,6 +50,31 @@ def test():
     s8 = next(x for x in o["signal"] if x["k"] == "ddr4_8g")
     assert s8["last"] == 44.1 and s8["d30"] < -3 and o["level"] == "warn" and "월 +3.8%" in o["text"], o
     assert ds.section(Path(tempfile.mkdtemp())) is None
+    # 계약가 표 → dram_hist.csv 자동 추가·같은 달 교체
+    C1 = """DRAM Contract Price (2H Oct) Last Update 2026-10-30 17:00 (GMT+8)
+| Item | Session High | Session Low | Session Average | Average Change | Low Change |
+| DDR4 8GB SO-DIMM | 151.00 | 132.00 | 148.00 | ▲ 4.23 % | ▲ 5.60 % |
+| DDR4 16Gb 2Gx8 | 61.00 | 49.00 | 52.00 | ▲ 4.00 % | ▲ 4.26 % |
+| DDR4 8Gb 1Gx8 | 35.50 | 23.50 | 27.50 | ▲ 5.77 % | ▲ 4.44 % |"""
+    assert ds.parse_contract(C1) == ("2026-10", 27.5)
+    assert ds.parse_contract(C1.replace("(2H Oct)", "(Dec)").replace("2026-10-30", "2027-01-02")) == ("2026-12", 27.5)
+    hp = d / "dram_hist.csv"
+    hp.write_text("# x\ndate,item,avg,src\n2026-09-01,ddr4_8g_contract,26.0,siliconanalysts\n"
+                  "2026-10-01,ddr4_8g_contract,27.0,siliconanalysts\n2026-09-01,ddr4_8g_spot,46.32,siliconanalysts\n")
+
+    class CS:
+        def __init__(self, page):
+            self.page = page
+
+        def get(self, url, **kw):
+            return R(self.page)
+    assert ds.collect_contract(hp, CS(C1)) == "2026-10"
+    assert ds.collect_contract(hp, CS(C1.replace("(2H Oct)", "(Nov)").replace("2026-10-30", "2026-11-28").replace("27.50", "29.00"))) == "2026-11"
+    lt = ds.long_term(hp)
+    cm = {x["d"]: x["v"] for x in lt["contract"]}
+    assert cm == {"2026-09-01": 26.0, "2026-10-01": 27.5, "2026-11-01": 29.0} and lt["auto_from"] == "2026-10", lt
+    assert any(x["d"] == "2026-11-01" and x["src"] == "daily" for x in lt["spot"]), lt["spot"]   # 일별 현물 → 월말 값
+    assert hp.read_text().startswith("# x\ndate,item,avg,src\n")
     print("dram_spot OK")
 
 

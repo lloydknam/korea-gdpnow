@@ -1,5 +1,6 @@
 # DDR4 8Gb 장기 시계열(달러/개). 계약가 = DRAMeXchange 월평균 고정거래가, 현물 = 월말 근사치.
-# 출처: siliconanalysts.com(TrendForce·DRAMeXchange 및 국내 언론 인용 정리). 날짜는 월 1일로 표기. 자동 수집 아님 — 필요 시 갱신.
+# 출처: ~2026-10 siliconanalysts.com 정리(TrendForce·DRAMeXchange 및 국내 언론 인용). 날짜는 월 1일로 표기.
+# 자동 수집: nowcast/dram_spot.py가 매일 TrendForce 계약가 표(DDR4 8Gb 1Gx8 세션 평균)를 읽어 src=trendforce 줄 추가·갱신
 # 2025-11 현물 15.90은 기존 일별 수집(11/12·11/18 약 12~13달러)과 어긋나 제외함.
 date,item,avg,src
 2022-01-01,ddr4_8g_contract,3.41,siliconanalysts
