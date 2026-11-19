@@ -14,6 +14,8 @@ releases:
     rule: {day: 1, no_shift: true}   # 산업부는 휴일에도 1일 발표
     ref: prev            # 전월 자료
     affects: [ex]
+    search: 수출입 현황
+    news: 수출입동향
   - key: cpi
     name: 소비자물가
     org: 통계청
@@ -21,6 +23,8 @@ releases:
     rule: {day: 2}
     ref: prev
     affects: [cpi]
+    search: 소비자물가동향
+    news: 소비자물가
   - key: customs_d10
     name: 수출입 현황(1~10일)
     org: 관세청
@@ -28,6 +32,8 @@ releases:
     rule: {day: 11}
     ref: cur
     affects: [ex]
+    search: 수출입 현황
+    news: 1~10일 수출
   - key: prices
     name: 수출입물가·무역지수
     org: 한국은행
@@ -35,6 +41,9 @@ releases:
     rule: {day: 15}
     ref: prev
     affects: [px, pm, ex]
+    url: https://ecos.bok.or.kr/
+    url_label: ECOS
+    news: 수출입물가지수
   - key: customs_d20
     name: 수출입 현황(1~20일)
     org: 관세청
@@ -42,6 +51,8 @@ releases:
     rule: {day: 21}
     ref: cur
     affects: [ex]
+    search: 수출입 현황
+    news: 1~20일 수출
   - key: esi
     name: 경제심리지수
     org: 한국은행
@@ -49,6 +60,9 @@ releases:
     rule: {day: 25}
     ref: cur
     affects: [esi]
+    url: https://ecos.bok.or.kr/
+    url_label: ECOS
+    news: 경제심리지수
   - key: activity
     name: 산업활동동향
     org: 통계청
@@ -56,6 +70,8 @@ releases:
     rule: {last_bday: true}
     ref: prev
     affects: [ip, sv, cn, pa]
+    search: 산업활동동향
+    news: 산업활동동향
   - key: gdp_adv
     name: GDP 속보
     org: 한국은행
@@ -63,6 +79,9 @@ releases:
     rule: {nth_weekday: [4, 3, [1, 4, 7, 10]]}
     ref: prevq
     affects: [gdp]
+    url: https://ecos.bok.or.kr/
+    url_label: ECOS
+    news: GDP 속보치
 
   - key: gdp_prelim
     name: GDP 잠정(명목 GDP·GNI 포함)
@@ -71,6 +90,9 @@ releases:
     rule: {nth_weekday: [2, 1, [3, 6, 9, 12]]}   # 대략 3·6·9·12월 둘째 화요일 무렵(2026.9.8). 확정일은 fixed에
     ref: prevq
     affects: [gdp, nominal]
+    url: https://ecos.bok.or.kr/
+    url_label: ECOS
+    news: 국민소득 잠정
 
 # 확정 일정 (공식 공지 확인 후 추가): key: [YYYY-MM-DD, ...]
 fixed:

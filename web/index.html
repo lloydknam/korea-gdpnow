@@ -222,6 +222,15 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 .cal .i{grid-column:2;font-size:12.5px;color:var(--ink-2)}
 .cal .tag{display:inline-block;font-size:10.5px;padding:0 5px;margin-left:5px;border:1px solid var(--axis);color:var(--ink-3);font-weight:500;vertical-align:1px}
 .cal li.big .n{color:var(--head)}
+.cal-d{margin-top:8px}
+.cal-d>summary{cursor:pointer;font-weight:700;font-size:14.5px;padding:6px 0}
+.cal-d>summary small{font-weight:500;color:var(--ink-2);font-size:12px;margin-left:6px}
+.cal .st{font-size:12px;font-weight:700;margin-left:6px}
+.cal .st.ok{color:var(--main)}
+.cal .st.no{color:var(--neg)}
+.cal .st.na{color:var(--ink-3);font-weight:500}
+.cal .lk{grid-column:2;font-size:12px}
+.cal .lk a{color:var(--main);margin-right:10px;text-decoration:none;border-bottom:1px solid var(--grid)}
 .lead b{font-weight:800}
 </style>
 </head>
@@ -268,9 +277,15 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
   </section>
 
   <section id="cal-sec" hidden>
-    <h2>다음 발표 일정</h2>
-    <p class="sub">평일 하루 4회 자동 갱신(04:07·09:15·12:40·17:30) → 발표 당일 반영, 주말 발표는 다음 평일 · '예상' = 통상 일정 기준 추정 날짜</p>
-    <ul class="cal" id="cal"></ul>
+    <h2>발표 일정</h2>
+    <p class="sub">평일 하루 4회 자동 갱신(04:07·09:15·12:40·17:30) → 발표 당일 반영, 주말 발표는 다음 평일 · '예상' = 통상 일정 기준 추정 날짜 · 눌러서 펼치기</p>
+    <details class="cal-d" id="cal-past-d"><summary id="cal-past-s">기발표 일정</summary>
+      <ul class="cal" id="cal-past"></ul>
+      <p class="note">✓ 반영 = 해당 기간 자료가 모형에 들어옴(시각 = 처음 반영된 갱신) · ✗ 미반영 = 발표일이 지났는데 아직 안 들어옴 · 보도자료 링크는 정책브리핑 검색(발표일 앞뒤 사흘), 한은 자료는 ECOS</p>
+    </details>
+    <details class="cal-d" id="cal-next-d"><summary id="cal-next-s">다음 발표 일정</summary>
+      <ul class="cal" id="cal"></ul>
+    </details>
   </section>
 
   <section>
@@ -1382,9 +1397,40 @@ const CAL_IMPACT = {
   customs_d10: "실질수출 속보 (반영 비중 50%)", customs_d20: "실질수출 속보 (반영 비중 80%)", customs_m: "실질수출 월 잠정치",
   prices: "수출입물가 → 디플레이터·경상성장률 · 수출물량지수 실적", cpi: "소비자물가 → 디플레이터", esi: "미발표 달 보간(심리지수)",
 };
+function renderCalPast() {
+  const P = DATA.released || [], ul = $("#cal-past"), dd = $("#cal-past-d"); ul.replaceChildren();
+  dd.hidden = !P.length; if (!P.length) return;
+  const md = s => `${+s.slice(5, 7)}/${+s.slice(8, 10)}`;
+  P.forEach(e => {
+    const li = h("li", e.key === "activity" || e.key === "gdp_adv" || e.key === "gdp_prelim" ? "big" : "");
+    const showDate = e.early && e.at ? e.at.slice(0, 10) : e.date;
+    const d = h("div", "d", `${md(showDate)} ${e.early && e.at ? "" : e.dow}`.trim());
+    d.appendChild(h("small", "", e.early && e.at ? e.at.slice(11, 16) : (e.time || ""))); li.appendChild(d);
+    const n = h("div", "n", e.name); n.appendChild(h("span", "", `${e.org} · ${e.ref}`));
+    if (e.early) n.appendChild(h("span", "tag", e.at ? `예정 ${md(e.date)}보다 일찍` : "예정일 전에 반영"));
+    else if (e.est) n.appendChild(h("span", "tag", "예상일"));
+    const st = e.got === true ? ["ok", "✓ 반영" + (e.at ? ` ${md(e.at)} ${e.at.slice(11, 16)}` : "")]
+      : e.got === false ? ["no", `✗ 미반영 (${e.days}일 경과)`] : ["na", "반영 확인 안 함"];
+    n.appendChild(h("span", "st " + st[0], st[1]));
+    li.appendChild(n);
+    if ((e.links || []).length) {
+      const lk = h("div", "lk");
+      e.links.forEach(l => { const a = h("a", "", l.label + " ↗"); a.href = l.url; a.target = "_blank"; a.rel = "noopener"; lk.appendChild(a); });
+      li.appendChild(lk);
+    }
+    ul.appendChild(li);
+  });
+  const no = P.filter(e => e.got === false).length;
+  const s = $("#cal-past-s"); s.replaceChildren("기발표 일정");
+  s.appendChild(h("small", "", `최근 한 달 ${P.length}건 · ${no ? `미반영 ${no}건` : "모두 반영"}`));
+}
 function renderCal() {
+  renderCalPast();
   const R = DATA.releases || [], sec = $("#cal-sec"), ul = $("#cal"); ul.replaceChildren();
-  sec.hidden = !R.length; if (!R.length) return;
+  sec.hidden = !R.length && !(DATA.released || []).length;
+  $("#cal-next-d").hidden = !R.length; if (!R.length) return;
+  const s = $("#cal-next-s"); s.replaceChildren("다음 발표 일정");
+  s.appendChild(h("small", "", `${R.length}건 · 다음 ${+R[0].date.slice(5, 7)}/${+R[0].date.slice(8)} ${R[0].name}`));
   R.forEach(e => {
     const li = h("li", e.key === "activity" || e.key === "gdp_adv" || e.key === "gdp_prelim" ? "big" : "");
     const d = h("div", "d", `${+e.date.slice(5, 7)}/${+e.date.slice(8)} ${e.dow}`); d.appendChild(h("small", "", e.time || "")); li.appendChild(d);

@@ -101,6 +101,68 @@ def upcoming(cfg: dict, now: datetime, rmse: dict | None = None, horizon: int = 
     return out[:limit]
 
 
+# ------------------------------------------------------------------ 기발표: 최근 발표 + 실제 반영 여부
+def _links(r: dict, d: date, ref: str) -> list[dict]:
+    """발표 자료 링크: 정부 보도자료는 정책브리핑 검색(발표일 앞뒤 사흘), 한은 자료는 ECOS, 기사는 뉴스 검색."""
+    from urllib.parse import quote
+    out = []
+    kw = r.get("search")
+    if kw:
+        a, b = (d - timedelta(days=3)).isoformat(), (d + timedelta(days=3)).isoformat()
+        out.append({"label": "보도자료", "url": f"https://www.korea.kr/briefing/pressReleaseList.do?srchWord={quote(kw)}"
+                                                  f"&startDate={a}&endDate={b}"})
+    if r.get("url"):
+        out.append({"label": r.get("url_label", "자료"), "url": r["url"]})
+    q = f"{r.get('org', '').split('·')[0]} {r.get('news') or r['name']} {ref}"
+    out.append({"label": "기사", "url": f"https://search.naver.com/search.naver?where=news&query={quote(q)}"})
+    return out
+
+
+def reflect_tag(key: str, ref: str) -> str | None:
+    """이력 파일 new_data에 남는 표시(반영 시각 찾기용). ref 예: '11월 1~10일', '10월분', '2026년 3분기'."""
+    import re as _re
+    m = _re.match(r"(\d+)월", ref)
+    q = _re.search(r"(\d)분기", ref)
+    return {
+        "customs_d10": m and f"관세청 속보({m[1]}월 1~10일)",
+        "customs_d20": m and f"관세청 속보({m[1]}월 1~20일)",
+        "customs_m": m and f"관세청 속보({m[1]}월 월간)",
+        "prices": "수출물가(원화)", "cpi": "소비자물가", "activity": "광공업",
+        "gdp_adv": q and f"{q[1]}분기 GDP 속보치", "gdp_prelim": "GDP 발표·개정",
+    }.get(key) or None
+
+
+def recent(cfg: dict, now: datetime, have: dict | None = None, days: int = 31, limit: int = 12) -> list[dict]:
+    """최근 days일 안에 발표된(예정일 지난) 일정 + 예정일보다 먼저 나와 이미 반영된 것.
+    got: True = 대상 기간 자료가 모형에 반영됨, False = 아직 안 들어옴, None = 감시 안 하는 항목."""
+    today = now.date()
+    fixed = {k: [date.fromisoformat(str(x)) for x in v] for k, v in (cfg.get("fixed") or {}).items()}
+    cur = pd.Period(today.strftime("%Y-%m"), "M")
+    out, seen = [], set()
+    for r in cfg["releases"]:
+        k = r["key"]
+        for p in (cur + 1, cur, cur - 1, cur - 2):
+            fx = [x for x in fixed.get(k, []) if x.year == p.year and x.month == p.month]
+            d = fx[0] if fx else rule_date(r["rule"], p.year, p.month)
+            if d is None:
+                continue
+            ref, rp = _ref_label(r.get("ref", "prev"), k, d)
+            got_p = (have or {}).get(k)
+            same = got_p is not None and getattr(got_p, "freqstr", None) == getattr(rp, "freqstr", None)
+            got = (got_p >= rp) if same else None
+            done_today = d == today and (not r.get("time") or now.strftime("%H:%M") >= r["time"])
+            past = d < today or done_today
+            early = not past and got is True
+            if not (past or early) or (past and (today - d).days > days) or (k, str(rp)) in seen:
+                continue
+            seen.add((k, str(rp)))
+            out.append({"date": d.isoformat(), "dow": WD[d.weekday()], "time": r.get("time"), "key": k,
+                        "name": r["name"], "org": r.get("org"), "ref": ref, "est": not fx, "early": early,
+                        "got": got, "days": (today - d).days, "links": _links(r, d, ref)})
+    out.sort(key=lambda x: (x["date"], x["time"] or ""), reverse=True)
+    return out[:limit]
+
+
 # ------------------------------------------------------------------ 미수집 감시
 FIX = {
     "customs": "data/customs_flash.csv에 한 줄 추가(휴대폰 GitHub에서 편집 → 저장하면 자동 재계산)",

@@ -623,6 +623,33 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         except Exception as e:  # noqa: BLE001
             print(f"::warning::발표 일정 생략 — {type(e).__name__} {e}")
 
+    # 기발표: 최근 한 달 발표 + 실제 반영 여부·반영 시각(이력 파일의 '새로 반영' 기록에서 찾음)
+    released = []
+    if rel_path.exists():
+        try:
+            released = releases.recent(yaml.safe_load(rel_path.read_text()), now, have)
+            logs = []
+            for fn in ("history.csv", "annual_history.csv"):
+                fp = data_dir / fn
+                if fp.exists():
+                    dfl = pd.read_csv(fp, dtype=str)
+                    if "new_data" in dfl:
+                        logs += [(a, str(b)) for a, b in zip(dfl["run_at"], dfl["new_data"]) if isinstance(b, str) and b != "nan"]
+            logs.sort()
+            for e in released:
+                tag = releases.reflect_tag(e["key"], e["ref"])
+                if not tag or not e.get("got"):
+                    continue
+                lo = (pd.Timestamp(e["date"]) - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
+                hi = (pd.Timestamp(e["date"]) + pd.Timedelta(days=7)).strftime("%Y-%m-%d")
+                hit = next((a for a, b in logs if lo <= a[:10] <= hi and tag in b), None)
+                if hit:
+                    e["at"] = hit[:16]
+                    if hit[:10] < e["date"]:
+                        e["early"] = True
+        except Exception as e:  # noqa: BLE001
+            print(f"::warning::기발표 일정 생략 — {type(e).__name__} {e}")
+
     # 미수집 감시: 발표일이 지났는데 반영 안 된 자료 → 사이트 배너 + data/alerts.json(→ GitHub 이슈)
     alerts = []
     if rel_path.exists() and have:
@@ -660,6 +687,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         "percap": ext["percap"],
         "world_gni": ext["world"],
         "releases": upcoming,
+        "released": released,
         "alerts": alerts,
     }
     (site_dir / "nowcast.json").write_text(json.dumps(payload, ensure_ascii=False))
