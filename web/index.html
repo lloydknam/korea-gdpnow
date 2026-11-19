@@ -917,9 +917,9 @@ function renderSpot() {
   const KEYS = [["ddr5_16g", "DDR5 16Gb", "--s1"], ["ddr4_16g", "DDR4 16Gb", "--s2"], ["ddr4_8g", "DDR4 8Gb", "--cmp1"]].filter(([k]) => S.series[k]);
   const lg = $("#spot-legend"); lg.replaceChildren();
   KEYS.forEach(([k, lab, c]) => { const sp = h("span"), ky = h("i", "key line"); ky.style.borderColor = css(c); sp.append(ky, lab); lg.appendChild(sp); });
-  // 그래프: 최근 6개월, 품목별 가격 수준이 달라 지수화(품목별 최신값 = 100) → 과거가 지금보다 얼마나 높았나/낮았나
+  // 그래프: 최근 1년, 품목별 가격 수준이 달라 지수화(품목별 최신값 = 100) → 과거가 지금보다 얼마나 높았나/낮았나
   const box = $("#c-spot"); box.replaceChildren();
-  const end = new Date(Math.max(...KEYS.map(([k]) => +new Date(S.series[k].at(-1).d)))), t0 = +end - 183 * 864e5;
+  const end = new Date(Math.max(...KEYS.map(([k]) => +new Date(S.series[k].at(-1).d)))), t0 = +end - 365 * 864e5;
   const ser = KEYS.map(([k, lab, c]) => {
     const pts = S.series[k].filter(p => +new Date(p.d) >= t0); const b0 = pts.length ? pts.at(-1).v : null;
     return { k, lab, c, pts: pts.map(p => ({ t: +new Date(p.d), v: p.v, i: p.v / b0 * 100 })) };
@@ -932,16 +932,18 @@ function renderSpot() {
   grid(svg, ticks, Y, m.l, W - m.r);
   ser.forEach(s => {
     el("path", { d: s.pts.map((p, i) => `${i ? "L" : "M"}${X(p.t)},${Y(p.i)}`).join(""), fill: "none", stroke: css(s.c), "stroke-width": 2.2, "stroke-linejoin": "round" }, svg);
+    // 실제 관측치마다 점(1년치는 관측 간격이 길어 선이 끊겨 보이는 구간이 있음), 최신값은 큰 점
+    s.pts.forEach(p => el("circle", { cx: X(p.t), cy: Y(p.i), r: 1.8, fill: css(s.c), opacity: .8 }, svg));
     const L = s.pts.at(-1); el("circle", { cx: X(L.t), cy: Y(L.i), r: 3.5, fill: css(s.c), stroke: css("--bg"), "stroke-width": 1.5 }, svg);
   });
   for (let d = new Date(new Date(t0).getFullYear(), new Date(t0).getMonth() + 1, 1); +d <= +end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1))
-    if (d.getMonth() % 2 === 0) txt(svg, X(+d), H - 6, `${d.getMonth() + 1}월`, { "text-anchor": "middle" });
+    if (d.getMonth() % 3 === 0) txt(svg, X(+d), H - 6, `${String(d.getFullYear()).slice(2)}.${d.getMonth() + 1}`, { "text-anchor": "middle" });
   // 표: 품목별 최신가·1주·1개월
   const tb = $("#spot-tbl"); tb.replaceChildren();
   tb.appendChild(smallTable(["품목", "현물가($)", "1주", "1개월"], S.signal.map(x => [x.label, x.last.toFixed(2),
     x.d7 == null ? "–" : fmt(x.d7, 1) + "%", x.d30 == null ? "–" : fmt(x.d30, 1) + "%"])));
   const last = S.signal.map(x => x.date).sort().at(-1);
-  $("#spot-note").textContent = `그래프 = 품목별 최신값 100 기준 지수(100보다 위 = 지금보다 비쌌던 때) · ${last} 기준 · 출처: ${S.src} · ` +
+  $("#spot-note").textContent = `그래프 = 최근 1년, 품목별 최신값 100 기준 지수(100보다 위 = 지금보다 비쌌던 때) · 점 = 실제 수집일 · ${last} 기준 · 출처: ${S.src} · ` +
     "현물가는 유통시장 시세로 대형 고객 계약가(한은 수출물가에 반영)보다 1~3개월 먼저 움직임 → 모형 계산엔 넣지 않고 경고용으로만 표시";
 }
 
