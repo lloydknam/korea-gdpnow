@@ -65,7 +65,9 @@ def _ref_label(ref: str, key: str, d: date) -> tuple[str, pd.Period]:
     return f"{p.month}월분", p
 
 
-def upcoming(cfg: dict, now: datetime, rmse: dict | None = None, horizon: int = 40, limit: int = 8) -> list[dict]:
+def upcoming(cfg: dict, now: datetime, rmse: dict | None = None, horizon: int = 40, limit: int = 8,
+             have: dict | None = None) -> list[dict]:
+    """다가오는 발표. have(키 → 이미 반영된 대상 기간)가 있으면 예정일 전에 먼저 나와 반영된 발표는 뺌."""
     today = now.date()
     fixed = {k: [date.fromisoformat(str(x)) for x in v] for k, v in (cfg.get("fixed") or {}).items()}
     out = []
@@ -82,6 +84,9 @@ def upcoming(cfg: dict, now: datetime, rmse: dict | None = None, horizon: int = 
             if d == today and r.get("time") and now.strftime("%H:%M") >= r["time"]:
                 continue  # 오늘 이미 발표된 것
             ref, rp = _ref_label(r.get("ref", "prev"), r["key"], d)
+            got = (have or {}).get(r["key"])
+            if got is not None and getattr(got, "freqstr", None) == getattr(rp, "freqstr", None) and got >= rp:
+                continue  # 예정일보다 일찍 발표돼 이미 반영됨
             item = {"date": d.isoformat(), "dow": WD[d.weekday()], "time": r.get("time"), "key": r["key"],
                     "name": r["name"], "org": r.get("org"), "ref": ref, "est": est, "affects": r.get("affects", [])}
             if r["key"] == "activity" and rmse:
@@ -121,10 +126,10 @@ def overdue(cfg: dict, now: datetime, have: dict, grace_days: int = 2) -> list[d
             if d is None or d > today:
                 continue
             ref, rp = _ref_label(r.get("ref", "prev"), k, d)
-            grace = grace_days + (2 if k == "gdp_adv" and not fx else 0)
+            grace = grace_days + (2 if k in ("gdp_adv", "gdp_prelim") and not fx else 0)
             got = have[k]
             if (today - d).days >= grace and (got is None or got < rp):
-                kind = "customs" if k.startswith("customs") else ("gdp" if k == "gdp_adv" else "ecos")
+                kind = "customs" if k.startswith("customs") else ("gdp" if k in ("gdp_adv", "gdp_prelim") else "ecos")
                 item = {"key": k, "name": r["name"], "org": r.get("org"), "ref": ref, "ref_period": str(rp),
                         "date": d.isoformat(), "est": not fx, "days": (today - d).days, "fix": FIX[kind]}
                 if kind == "customs":

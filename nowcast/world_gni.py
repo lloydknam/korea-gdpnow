@@ -117,7 +117,7 @@ def section(data_dir: Path, now: datetime, years: int = 21, sess=None) -> dict |
     for c, f in imf_forecast(sess, now.year).items():
         base = next((p["v"] for p in out.get(c, {}).get("pts", []) if p["y"] == last_year), None)
         if base is not None:
-            fc[c] = {"y": now.year, "v": round(base * f["g"])}
+            fc[c] = {"y": now.year, "v": round(base * f["g"]), "g": round((f["g"] - 1) * 100, 1)}
     notes = "세계은행 WDI (GNI 경상 달러 ÷ 인구)"
     if fc:
         notes += f" · {now.year}년 전망: IMF 1인당 GDP 증가율을 {last_year}년 실적에 적용(추정)"

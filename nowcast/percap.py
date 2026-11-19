@@ -57,6 +57,28 @@ def discover(e: Ecos) -> dict | None:
     return None
 
 
+def discover_pop(e: Ecos) -> dict | None:
+    """한은 ECOS에서 연간 추계인구(총인구) 통계표·항목을 이름으로 찾음 → {pop_stat, pop, pop_unit}."""
+    cands = []
+    for t in e.tables():
+        nm = t.get("STAT_NAME") or ""
+        if t.get("CYCLE") == "A" and t.get("STAT_CODE") and ("추계인구" in nm or "장래인구" in nm or nm.endswith("인구")):
+            cands.append(t)
+    cands.sort(key=lambda t: (0 if "추계인구" in (t.get("STAT_NAME") or "") else 1))
+    for t in cands[:6]:
+        try:
+            its = e.items(t["STAT_CODE"])
+        except Exception:  # noqa: BLE001
+            continue
+        its = [i for i in its if (i.get("CYCLE") or "A") == "A"]
+        best = next((i for i in its if (i.get("ITEM_NAME") or "").strip() in ("총인구", "추계인구", "인구")), None) \
+            or next((i for i in its if "총인구" in (i.get("ITEM_NAME") or "")), None)
+        if best:
+            return {"pop_stat": t["STAT_CODE"], "pop": best["ITEM_CODE"], "pop_unit": best.get("UNIT_NAME") or "",
+                    "pop_name": f"{t.get('STAT_NAME')} · {best.get('ITEM_NAME')}"}
+    return None
+
+
 def _annual(e: Ecos, stat: str, code: str, y0: int, y1: int) -> dict[int, float]:
     js = e._get("/".join(["StatisticSearch", e.key, "json", "kr", "1", "1000", stat, "A", str(y0), str(y1), code]))
     out = {}
@@ -101,10 +123,26 @@ def section(key: str | None, data_dir: Path, now: datetime, year: int, nominal: 
                 print("::warning::1인당 GNI 통계표를 못 찾음 — 건너뜀")
                 return None
             path.write_text(json.dumps(codes, ensure_ascii=False, indent=1))
+        # 인구: 주요지표 표에 없으면 추계인구 표를 따로 찾음(7일에 한 번만 재시도)
+        if not codes.get("pop") and codes.get("pop_tried", "") < (now - pd.Timedelta(days=7)).strftime("%Y-%m-%d"):
+            try:
+                pc = discover_pop(e)
+            except Exception as ex:  # noqa: BLE001
+                pc = None
+                print(f"::notice::추계인구 표 탐색 실패 — {type(ex).__name__}")
+            codes.update(pc or {})
+            codes["pop_tried"] = now.strftime("%Y-%m-%d")
+            path.write_text(json.dumps(codes, ensure_ascii=False, indent=1))
+            print(f"::notice::추계인구: {pc['pop_name'] + ' (' + pc['pop_stat'] + ')' if pc else '표를 못 찾음 → 전년과 같다고 가정'}")
         try:
-            data = {k: _annual(e, codes["stat"], codes[k], year - 21, year) for k in ("usd", "krw", "pop") if codes.get(k)}
+            data = {k: _annual(e, codes["stat"], codes[k], year - 21, year) for k in ("usd", "krw") if codes.get(k)}
         except Exception:  # noqa: BLE001
             data = {}
+        if codes.get("pop"):
+            try:
+                data["pop"] = _annual(e, codes.get("pop_stat") or codes["stat"], codes["pop"], year - 3, year + 1)
+            except Exception as ex:  # noqa: BLE001
+                print(f"::notice::추계인구 조회 실패 — {type(ex).__name__}")
         if data.get("usd"):
             break
         codes = None   # 캐시 코드로 자료가 안 나옴 → 다시 찾기
@@ -124,7 +162,8 @@ def section(key: str | None, data_dir: Path, now: datetime, year: int, nominal: 
            "prev_year": year - 1, "prev_usd": round(base),
            "hist": [{"y": y, "usd": round(u)} for y, u in sorted(usd.items()) if y < year],
            "growth_usd": round((v / base - 1) * 100, 1), "nominal": round(nominal, 2),
-           "pop_g": round(pop_g * 100, 2), "pop_src": "한은 주요지표 추계인구" if year in pop else "가정(전년과 같음)",
+           "pop_g": round(pop_g * 100, 2),
+           "pop_src": (codes.get("pop_name") or "한은 추계인구") if (year in pop and (year - 1) in pop) else "가정(전년과 같음)",
            "fx_prev": round(fp, 1), "fx_cur": round(fc, 1), "fx_note": fx_note,
            "fx_effect": round((fp / fc - 1) * 100, 1), "src": f"한은 ECOS {codes['stat']}"}
     krw = data.get("krw") or {}

@@ -64,5 +64,14 @@ releases:
     ref: prevq
     affects: [gdp]
 
+  - key: gdp_prelim
+    name: GDP 잠정(명목 GDP·GNI 포함)
+    org: 한국은행
+    time: "08:00"
+    rule: {nth_weekday: [2, 1, [3, 6, 9, 12]]}   # 대략 3·6·9·12월 둘째 화요일 무렵(2026.9.8). 확정일은 fixed에
+    ref: prevq
+    affects: [gdp, nominal]
+
 # 확정 일정 (공식 공지 확인 후 추가): key: [YYYY-MM-DD, ...]
-fixed: {}
+fixed:
+  gdp_prelim: [2026-12-09]   # 한은 SDDS 공표일정: 12.9 08:00 국민소득 잠정(2026.3/4)

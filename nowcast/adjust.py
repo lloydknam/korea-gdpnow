@@ -124,7 +124,7 @@ TREND_DECAY = 0.7   # 추세 연장 시 달마다 기울기를 70%로 줄임(먼
 
 
 def extend_split(total: pd.Series, chip: pd.Series | None, through: pd.Period, w: float | None = None,
-                 months: int = 3, decay: float = TREND_DECAY):
+                 months: int = 3, decay: float = TREND_DECAY, chip_g: float | None = None):
     """물가 총지수를 through 월까지 연장. 총지수 ≈ w·반도체 + (1−w)·비반도체(지수 수준)로 나눠
     각자 최근 months개월 로그 추세를 감쇠시키며 연장 → 합침. 반환: (연장된 총지수, 정보 dict)."""
     t = total.dropna()
@@ -139,6 +139,8 @@ def extend_split(total: pd.Series, chip: pd.Series | None, through: pd.Period, w
     n = ((t - w * c.reindex(t.index)) / (1 - w)).dropna()
     n = n[n > 0]
     gc = float(np.log(c[c.index <= t0]).diff().tail(months).mean())
+    if chip_g is not None:   # 시나리오: 반도체 단가 추세를 지정값(월 로그 변화)으로 바꿈 — 예: 0 = 보합
+        gc = chip_g
     gn = float(np.log(n[n.index <= t0]).diff().tail(months).mean())
     out = t[t.index <= t0].copy()
     lc, ln, cum = c[t0], n[t0], 0.0
@@ -193,7 +195,7 @@ def chip_flash_points(chip_vol: pd.Series, chip_px: pd.Series, flash: pd.DataFra
 
 
 def extend_krw_by_fx(krw: pd.Series, usd: pd.Series, chip_usd: pd.Series | None, fx_daily: pd.Series,
-                     through: pd.Period, recent_days: int = 5):
+                     through: pd.Period, recent_days: int = 5, chip_g: float | None = None):
     """원화 가격지수 미발표 달 = 달러 가격지수(반도체·기타 추세 연장) × 환율.
     환율: 원화÷달러 지수 비율(실효 환율)을 원/달러 월평균에 맞춘 뒤(k = F/E, 마지막 실적 달),
     미발표 달은 실제 원/달러 월평균(이번 달은 지금까지 평균), 아직 안 온 달은 최근 5영업일 평균 유지."""
@@ -201,7 +203,7 @@ def extend_krw_by_fx(krw: pd.Series, usd: pd.Series, chip_usd: pd.Series | None,
     last = t.index.max()
     if last >= through:
         return t, {"method": "actual", "added": 0}
-    d_ext, info = extend_split(usd, chip_usd, through)
+    d_ext, info = extend_split(usd, chip_usd, through, chip_g=chip_g)
     fx = fx_daily.dropna()
     fx = fx[(fx > 300) & (fx < 5000)]              # 원/달러 범위 밖 값은 버림
     em = fx.groupby(fx.index.asfreq("M")).mean()

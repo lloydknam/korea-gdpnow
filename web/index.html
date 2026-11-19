@@ -289,6 +289,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
     <div class="spot" id="spot-box" hidden>
       <div class="spot-h"><span class="spot-badge" id="spot-badge"></span><b>선행 경고 · D램 현물가</b></div>
       <p class="spot-t" id="spot-text"></p>
+      <p class="note" id="spot-sc" hidden></p>
       <div class="legend" id="spot-legend"></div>
       <div class="chart" id="c-spot"></div>
       <div id="spot-tbl"></div>
@@ -480,7 +481,7 @@ function renderHead() {
     row.appendChild(pb);
     c.appendChild(row);
     c.appendChild(h("div", "h-n", `범위 ${PC.lo.toLocaleString("en-US")} ~ ${PC.hi.toLocaleString("en-US")}달러`));
-    c.appendChild(h("div", "h-n", `= 명목 성장 ${fmt(PC.nominal, 1)}% · 환율 효과 ${fmt(PC.fx_effect, 1)}% · 인구 ${fmt(PC.pop_g, 2)}%`));
+    c.appendChild(h("div", "h-n", `= 명목 성장 ${fmt(PC.nominal, 1)}% · 환율 효과 ${fmt(PC.fx_effect, 1)}% · 인구 ${fmt(PC.pop_g, 2)}%${(PC.pop_src || "").startsWith("가정") ? "(가정)" : ""}`));
     box.appendChild(c);
   }
   const m = h("div", "h-meta");
@@ -590,7 +591,9 @@ function renderPcWorld(box, note) {
   box.appendChild(tb);
   note.textContent = "단위 달러 · 한국 = 한은(원화 GNI ÷ 연평균 환율 ÷ 인구)" + (PC ? `, ${PC.year}년*은 이 모형 추정` : "") +
     " · 미국·일본·중국 = 세계은행(경상 달러 GNI ÷ 인구, Atlas 방식 아님)" +
-    (Object.keys(WF).length ? ` · ${Object.values(WF)[0].y}년* 미국·일본·중국은 IMF 1인당 GDP 전망 증가율을 전년 실적에 적용한 추정` : "") +
+    (Object.keys(WF).length ? ` · ${Object.values(WF)[0].y}년* 미국·일본·중국은 IMF 1인당 GDP 전망 증가율을 전년 실적에 적용한 추정` +
+      (Object.values(WF).some(f => f.g != null) ? "(달러 기준 증가율: " + ["USA", "JPN", "CHN"].filter(k => WF[k] && WF[k].g != null)
+        .map(k => `${WG[k].name} ${fmt(WF[k].g, 1)}%`).join(", ") + " — 환율 변화 포함, 중국은 위안화 강세 전망 영향이 큼)" : "") : "") +
     " · 그래프 눈금 단위 만 달러" +
     (Object.keys(WG).length ? "" : " · 다른 나라 자료는 다음 갱신 때 들어옴");
 }
@@ -918,6 +921,17 @@ function renderSpot() {
   const LV = { warn: "경고", watch: "주의", up: "상승", flat: "보합", na: "축적 중" };
   const bd = $("#spot-badge"); bd.textContent = LV[S.level] || S.level; bd.className = "spot-badge sb-" + S.level;
   $("#spot-text").textContent = S.text;
+  // 모형 영향: 반도체 수출물가 미발표 달을 보합으로 둔 시나리오(헤드라인은 그대로)
+  const SC = (DATA.annual || {}).scenario_chip_flat, sct = $("#spot-sc");
+  if (sct) {
+    sct.hidden = !SC;
+    if (SC) {
+      const mm = SC.from && SC.to ? `${+SC.from.slice(5)}~${+SC.to.slice(5)}월 ` : "";
+      sct.textContent = `모형 민감도: 반도체 수출물가 ${mm}보합이면 명목성장률 ${DATA.annual.nominal.toFixed(1)}% → ${SC.nominal.toFixed(1)}%` +
+        ` (${fmt(SC.delta, 1)}%p)` + (SC.percap_usd ? `, 1인당 GNI ${DATA.percap.usd.toLocaleString("en-US")} → ${SC.percap_usd.toLocaleString("en-US")}달러` : "") +
+        " · 실질·환율은 그대로 둔 단순 계산";
+    }
+  }
   const KEYS = [["ddr5_16g", "DDR5 16Gb", "--s1"], ["ddr4_16g", "DDR4 16Gb", "--s2"], ["ddr4_8g", "DDR4 8Gb", "--cmp1"]].filter(([k]) => S.series[k]);
   const lg = $("#spot-legend"); lg.replaceChildren();
   KEYS.forEach(([k, lab, c]) => { const sp = h("span"), ky = h("i", "key line"); ky.style.borderColor = css(c); sp.append(ky, lab); lg.appendChild(sp); });
@@ -1371,7 +1385,7 @@ function renderCal() {
   const R = DATA.releases || [], sec = $("#cal-sec"), ul = $("#cal"); ul.replaceChildren();
   sec.hidden = !R.length; if (!R.length) return;
   R.forEach(e => {
-    const li = h("li", e.key === "activity" || e.key === "gdp_adv" ? "big" : "");
+    const li = h("li", e.key === "activity" || e.key === "gdp_adv" || e.key === "gdp_prelim" ? "big" : "");
     const d = h("div", "d", `${+e.date.slice(5, 7)}/${+e.date.slice(8)} ${e.dow}`); d.appendChild(h("small", "", e.time || "")); li.appendChild(d);
     const n = h("div", "n", e.name); n.appendChild(h("span", "", `${e.org} · ${e.ref}`));
     if (e.est) n.appendChild(h("span", "tag", "예상"));
@@ -1381,6 +1395,7 @@ function renderCal() {
       ? `광공업·서비스업·건설업·공공행정 → ${e.impact.quarter.replace("Q", "년 ")}분기 실적 ${e.impact.k_from}→${e.impact.k_to}개월, 오차 ±${e.impact.rmse_from.toFixed(2)} → ±${e.impact.rmse_to.toFixed(2)}%p(전기비)`
       : "광공업·서비스업·건설업·공공행정 실적";
     if (e.key === "gdp_adv") imp = `${e.ref} 실적 확정 → 추정치 채점, 계수 재추정, 연간 재계산`;
+    if (e.key === "gdp_prelim") imp = `${e.ref} 명목 GDP 첫 발표·실질 개정 → 디플레이터 실적 반영, 명목성장률·1인당 GNI 재계산(가장 큰 변동 요인)`;
     li.appendChild(h("div", "i", imp));
     ul.appendChild(li);
   });

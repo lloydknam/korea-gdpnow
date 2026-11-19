@@ -70,7 +70,16 @@ def build_levels(cfg: dict, raw: dict, now: datetime | None = None):
             x = adjust.seasonal_adjust(x)
         levels[k] = x
         meta[k] = {"actual_last": actual_last, "last": x.index.max()}
-    ext_info = {}
+    dl, dm = deflator_levels(cfg, raw, now)
+    levels.update(dl)
+    meta.update(dm)
+    return levels, meta, customs_used
+
+
+def deflator_levels(cfg: dict, raw: dict, now: datetime | None = None, chip_g: float | None = None):
+    """디플레이터 브리지 지표(수출입물가 등) 수준 + 미발표 달 연장. chip_g: 반도체 단가 추세 시나리오(None=실제 추세)."""
+    levels, meta, ext_info = {}, {}, {}
+    quiet = chip_g is not None
     for k, s in cfg["deflator"]["bridge"].items():
         x = raw[k]
         actual_last = x.index.max()
@@ -78,22 +87,22 @@ def build_levels(cfg: dict, raw: dict, now: datetime | None = None):
         if s.get("fx") and fx is not None and not fx.empty and raw.get(s["usd"]) is not None:
             # 원화 수출물가 = 달러 가격(반도체·기타 추세 연장) × 실제 환율(일별 원/달러) — 환율은 추세로 늘리지 않음
             through = pd.Period(f"{(now or datetime.now(KST)).year}-12", "M")
-            x, info = adjust.extend_krw_by_fx(x, raw[s["usd"]], raw.get(s.get("usd_chip", "")), fx, through)
+            x, info = adjust.extend_krw_by_fx(x, raw[s["usd"]], raw.get(s.get("usd_chip", "")), fx, through, chip_g=chip_g)
             ext_info[k] = info
-            if info.get("added"):
+            if info.get("added") and not quiet:
                 print(f"::notice::{s['label']} {info['from']}~{info['to']} = 달러가격 추세[{info['method']}, 반도체 월 "
                       f"{info['chip_trend']:+.1f}% · 기타 월 {info['other_trend']:+.1f}%] × 실제 환율 {info['fx_text']}")
         elif s.get("split_chip") and raw.get(s["split_chip"]) is not None:
             # 수출물가 미발표 달(연말까지): 반도체 단가 추세를 따로 반영해 연장 → AR 외삽 대신 사용
             through = pd.Period(f"{(now or datetime.now(KST)).year}-12", "M")
-            x, info = adjust.extend_split(x, raw[s["split_chip"]], through)
+            x, info = adjust.extend_split(x, raw[s["split_chip"]], through, chip_g=chip_g)
             ext_info[k] = info
-            if info.get("added"):
+            if info.get("added") and not quiet:
                 print(f"::notice::{s['label']} {info['from']}~{info['to']} 추세 연장 [{info['method']}] "
                       f"반도체 월 {info['chip_trend']:+.1f}% · 기타 월 {info['other_trend']:+.1f}% (달마다 70%로 감쇠)")
         levels[k] = adjust.seasonal_adjust(x) if s.get("seasonal_adjust") else x
         meta[k] = {"actual_last": actual_last, "last": x.index.max(), "ext": ext_info.get(k)}
-    return levels, meta, customs_used
+    return levels, meta
 
 
 def deflator_series(gdp: pd.Series, nominal: pd.Series) -> pd.Series:
@@ -426,6 +435,24 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
             "nominal_last": str(raw["nominal"].dropna().index.max()),
             "yoy": yoy_path(real_map, defl_map, sd_r, sd_d, "2019Q1", pd.Period(f"{year}Q4", "Q")),
         }
+        # D램 현물 경고용 시나리오: 반도체 수출물가(달러) 미발표 달을 보합으로 두면 디플레이터·명목이 얼마나 바뀌나
+        # (실질·환율·비반도체 가격은 그대로, 디플레이터 브리지 계수도 그대로 — 가격 가정만 바꾼 민감도)
+        try:
+            dl0, dm0 = deflator_levels(cfg, raw, now, chip_g=0.0)
+            lv0 = {**levels, **dl0}
+            defl0 = dict(defl_map)
+            for qq in [x for x in defl_map if src.get(x, {}).get("defl") == "n"]:
+                defl0[qq] = model.nowcast(lv0, None, qq, dbridge, mcfg_d)["value"]
+            a0 = chain_annual(year, real_map, defl0)
+            ex0 = next((m.get("ext") for m in dm0.values() if (m.get("ext") or {}).get("added")), None) or {}
+            if a0:
+                annual["scenario_chip_flat"] = {
+                    "nominal": r(a0["nominal"]), "deflator": r(a0["deflator"]),
+                    "delta": r(a0["nominal"] - ann["nominal"]), "from": ex0.get("from"), "to": ex0.get("to")}
+                print(f"::notice::시나리오(반도체 수출물가 {ex0.get('from')}~{ex0.get('to')} 보합): "
+                      f"명목 {ann['nominal']:.2f}% → {a0['nominal']:.2f}% ({a0['nominal'] - ann['nominal']:+.2f}%p)")
+        except Exception as e:  # noqa: BLE001
+            print(f"::warning::반도체 보합 시나리오 생략 — {type(e).__name__} {e}")
         # 이번 실행에서 새로 반영된 지표 (변화 원인 주석용)
         run_new = []
         for row in new_hist:
@@ -565,29 +592,41 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
                 ext["errors"].append(f"{name}: {type(e).__name__} {e}")
         for e in ext["errors"]:
             print(f"::warning::부가 분석 일부 생략 — {e}")
+    # 반도체 보합 시나리오 → 1인당 GNI도 같은 비율로
+    sc = (annual or {}).get("scenario_chip_flat")
+    if sc and ext.get("percap"):
+        pc = ext["percap"]
+        sc["percap_usd"] = round(pc["usd"] * (1 + sc["nominal"] / 100) / (1 + pc["nominal"] / 100))
+
+    rel_path = ROOT / "config" / "releases.yaml"
+    # 이미 반영된 가장 최근 대상 기간(발표가 예정일보다 일찍 나온 경우 '다음 발표'에서 빼고, 늦으면 미수집 경고)
+    have = {}
+    try:
+        flash = adjust.load_customs(ROOT / "data" / "customs_flash.csv")
+        ex_off = meta["ex"]["actual_last"]
+
+        def got_flash(min_rank):
+            ms = list(flash.loc[flash["rank"] >= min_rank, "ref"]) if not flash.empty else []
+            return max(ms + [ex_off])
+
+        have = {"customs_d10": got_flash(0), "customs_d20": got_flash(1), "customs_m": got_flash(2),
+                "prices": raw["px"].index.max(), "cpi": raw["cpi"].index.max(), "esi": esi.index.max(),
+                "activity": raw["ip"].index.max(), "gdp_adv": gdp.dropna().index.max(),
+                "gdp_prelim": raw["nominal"].dropna().index.max()}
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::반영 현황 계산 생략 — {type(e).__name__} {e}")
 
     upcoming = []
-    rel_path = ROOT / "config" / "releases.yaml"
     if rel_path.exists():
         try:
-            upcoming = releases.upcoming(yaml.safe_load(rel_path.read_text()), now, bt["rmse"])
+            upcoming = releases.upcoming(yaml.safe_load(rel_path.read_text()), now, bt["rmse"], have=have)
         except Exception as e:  # noqa: BLE001
             print(f"::warning::발표 일정 생략 — {type(e).__name__} {e}")
 
     # 미수집 감시: 발표일이 지났는데 반영 안 된 자료 → 사이트 배너 + data/alerts.json(→ GitHub 이슈)
     alerts = []
-    if rel_path.exists():
+    if rel_path.exists() and have:
         try:
-            flash = adjust.load_customs(ROOT / "data" / "customs_flash.csv")
-            ex_off = meta["ex"]["actual_last"]
-
-            def got_flash(min_rank):
-                ms = list(flash.loc[flash["rank"] >= min_rank, "ref"]) if not flash.empty else []
-                return max(ms + [ex_off])
-
-            have = {"customs_d10": got_flash(0), "customs_d20": got_flash(1), "customs_m": got_flash(2),
-                    "prices": raw["px"].index.max(), "cpi": raw["cpi"].index.max(), "esi": esi.index.max(),
-                    "activity": raw["ip"].index.max(), "gdp_adv": gdp.dropna().index.max()}
             alerts = releases.overdue(yaml.safe_load(rel_path.read_text()), now, have)
         except Exception as e:  # noqa: BLE001
             print(f"::warning::미수집 감시 생략 — {type(e).__name__} {e}")
