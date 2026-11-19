@@ -136,7 +136,22 @@ def section(data_dir: Path, chip_trend: float | None = None) -> dict | None:
     if chip_trend is not None and level in ("warn", "watch") and chip_trend > 0:
         text += f" · 모형은 수출물가 월 {chip_trend:+.1f}% 추세 연장 중"
     return {"series": series, "signal": sig, "level": level, "text": text,
+            "hist": long_term(data_dir / "dram_hist.csv"),
             "src": "TrendForce·DRAMeXchange 현물 세션 평균가(달러/개)"}
+
+
+def long_term(path: Path = ROOT / "data" / "dram_hist.csv") -> dict | None:
+    """DDR4 8Gb 장기 시계열(월): 계약가(월평균) · 현물(드문드문). 자동 수집이 아니라 정리본 CSV."""
+    if not path.exists():
+        return None
+    df = pd.read_csv(path, comment="#", dtype={"date": str, "item": str})
+    if df.empty:
+        return None
+    out = {}
+    for item, key in (("ddr4_8g_contract", "contract"), ("ddr4_8g_spot", "spot")):
+        d = df[df["item"] == item].sort_values("date")
+        out[key] = [{"d": r.date, "v": round(float(r.avg), 3)} for r in d.itertuples()]
+    return out if out["contract"] or out["spot"] else None
 
 
 def main(argv=None) -> int:

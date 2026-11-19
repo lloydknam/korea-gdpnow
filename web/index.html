@@ -164,6 +164,7 @@ dialog.chg::backdrop{background:rgba(20,24,29,.45)}
 .chg tr.sum td{font-weight:700;border-top:1px solid var(--axis)}
 .spot{margin-top:16px;border:1px solid var(--rule);border-radius:10px;padding:12px 12px 6px}
 .spot-h{display:flex;align-items:center;gap:8px;font-size:14px}
+.spot-h5{font-size:13px;font-weight:700;color:var(--ink-2);margin:16px 0 4px}
 .spot-badge{font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:999px;color:#fff;background:var(--cmp2)}
 .spot-badge.sb-warn{background:var(--neg)} .spot-badge.sb-watch{background:var(--s4)} .spot-badge.sb-up{background:var(--s3)}
 .spot-t{font-size:13px;margin:6px 0 8px;color:var(--ink)}
@@ -292,6 +293,9 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
       <div class="chart" id="c-spot"></div>
       <div id="spot-tbl"></div>
       <p class="note" id="spot-note"></p>
+      <h3 class="spot-h5">DDR4 8Gb 5년 추이 (달러·로그 눈금)</h3>
+      <div class="chart" id="c-spot5"></div>
+      <p class="note" id="spot5-note"></p>
     </div>
   </section>
 
@@ -945,6 +949,35 @@ function renderSpot() {
   const last = S.signal.map(x => x.date).sort().at(-1);
   $("#spot-note").textContent = `그래프 = 최근 1년, 품목별 최신값 100 기준 지수(100보다 위 = 지금보다 비쌌던 때) · 점 = 실제 수집일 · ${last} 기준 · 출처: ${S.src} · ` +
     "현물가는 유통시장 시세로 대형 고객 계약가(한은 수출물가에 반영)보다 1~3개월 먼저 움직임 → 모형 계산엔 넣지 않고 경고용으로만 표시";
+  renderSpotLong(S);
+}
+
+function renderSpotLong(S) {
+  const H5 = S.hist, box = $("#c-spot5"), nt = $("#spot5-note");
+  box.replaceChildren(); nt.textContent = "";
+  if (!H5 || !(H5.contract || []).length) { box.hidden = true; nt.hidden = true; return; }
+  box.hidden = false; nt.hidden = false;
+  const C = H5.contract.map(p => ({ t: +new Date(p.d), v: p.v })), P = (H5.spot || []).map(p => ({ t: +new Date(p.d), v: p.v }));
+  const all = [...C, ...P], t0 = Math.min(...all.map(p => p.t)), t1 = Math.max(...all.map(p => p.t));
+  const vmin = Math.min(...all.map(p => p.v)), vmax = Math.max(...all.map(p => p.v));
+  const TK = [1, 2, 5, 10, 20, 50, 100, 200].filter(v => v >= vmin * 0.7 && v <= vmax * 1.4);
+  const L0 = Math.log10(TK[0]), L1 = Math.log10(TK.at(-1));
+  const W = box.clientWidth || 340, H = 170, m = { t: 10, r: 14, b: 22, l: 36 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "DDR4 8Gb 5년 추이" }, box);
+  const X = t => m.l + (W - m.l - m.r) * (t - t0) / (t1 - t0);
+  const Y = v => m.t + (H - m.t - m.b) * (1 - (Math.log10(v) - L0) / (L1 - L0));
+  TK.forEach(tk => { el("line", { x1: m.l, x2: W - m.r, y1: Y(tk), y2: Y(tk), stroke: css("--grid") }, svg);
+    txt(svg, m.l - 6, Y(tk) + 3.5, "$" + tk, { "text-anchor": "end" }); });
+  for (let y = new Date(t0).getFullYear() + 1; ; y++) {
+    const t = +new Date(`${y}-01-01`); if (t > t1) break;
+    txt(svg, X(t), H - 6, `${String(y).slice(2)}년`, { "text-anchor": "middle" });
+  }
+  el("path", { d: C.map((p, i) => `${i ? "L" : "M"}${X(p.t)},${Y(p.v)}`).join(""), fill: "none", stroke: css("--s1"), "stroke-width": 2.2, "stroke-linejoin": "round" }, svg);
+  P.forEach(p => el("circle", { cx: X(p.t), cy: Y(p.v), r: 3, fill: css("--s3") }, svg));
+  const last = C.at(-1);
+  el("circle", { cx: X(last.t), cy: Y(last.v), r: 3.5, fill: css("--s1"), stroke: css("--bg"), "stroke-width": 1.5 }, svg);
+  nt.textContent = `선 = 계약가(DRAMeXchange 월평균, ${H5.contract.at(-1).d.slice(0, 7)}까지) · 점 = 현물(관측된 달만) · 로그 눈금 · ` +
+    "출처: siliconanalysts.com 정리(TrendForce·DRAMeXchange 인용) — 자동 수집 아님, 장기 자료는 필요 시 갱신";
 }
 
 // ================================================================ 품목별 수출액: 연간 누적 영역
