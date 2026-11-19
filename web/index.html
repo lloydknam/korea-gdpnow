@@ -213,7 +213,8 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 .key.gni{height:0;border-top:2.5px solid var(--cmp1);margin-top:6px}
 .lead{font-size:13.5px;margin:4px 0 10px}
 .cal{list-style:none;margin:6px 0 0;padding:0}
-.cal li{display:grid;grid-template-columns:62px 1fr;gap:2px 12px;padding:9px 0;border-bottom:1px solid var(--grid)}
+.cal li{display:grid;grid-template-columns:62px 1fr;gap:2px 12px;align-content:start;padding:8px 0;border-bottom:1px solid var(--grid)}
+.cal li>.d{grid-row:span 3;align-self:start}
 .cal li:last-child{border-bottom:0}
 .cal .d{font-weight:800;font-variant-numeric:tabular-nums;font-size:14px;line-height:1.3}
 .cal .d small{display:block;font-weight:500;font-size:11.5px;color:var(--ink-3)}
@@ -222,7 +223,8 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
 .cal .i{grid-column:2;font-size:12.5px;color:var(--ink-2)}
 .cal .tag{display:inline-block;font-size:10.5px;padding:0 5px;margin-left:5px;border:1px solid var(--axis);color:var(--ink-3);font-weight:500;vertical-align:1px}
 .cal li.big .n{color:var(--head)}
-.cal-d{margin-top:8px}
+.cal-d{margin-top:4px}
+.cal-d>.note{margin:4px 0 8px}
 .cal-d>summary{cursor:pointer;font-weight:700;font-size:14.5px;padding:6px 0}
 .cal-d>summary small{font-weight:500;color:var(--ink-2);font-size:12px;margin-left:6px}
 .cal .st{font-size:12px;font-weight:700;margin-left:6px}
