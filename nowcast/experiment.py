@@ -29,7 +29,13 @@ def main():
     levels, meta, _ = build_levels(cfg2, raw, now)
     gdp, esi, mcfg = raw["gdp"], raw["esi"], cfg["model"]
     base = list(cfg["bridge"].keys())
-    variants = {"A 기존": base, "B +실질수입": base + ["im"]}
+    # C: 순수출 합성지수 — 국민계정 비중으로 가중한 수출−수입 로그 증가(계수 부호를 이론대로 고정)
+    lx, lm = np.log(levels["ex"]), np.log(levels["im"])
+    j = pd.concat([lx.rename("x"), lm.rename("m")], axis=1).dropna()
+    d = 0.45 * j["x"].diff() - 0.40 * j["m"].diff()
+    levels["nx"] = np.exp(d.fillna(0).cumsum()) * 100
+    variants = {"A 기존": base, "B +실질수입": base + ["im"],
+                "C 수출→순수출": [k for k in base if k != "ex"] + ["nx"]}
     res = {}
     for name, keys in variants.items():
         bt = model.backtest(levels, esi, gdp, mcfg, keys)
@@ -44,17 +50,14 @@ def main():
         for k in range(4):
             e = rec["actual"] - rec[f"k{k}"]
             print(f"    최근(2024~) k{k}: RMSE {np.sqrt(np.mean(e ** 2)):.3f}, 평균오차(실적−추정) {e.mean():+.3f}")
+        # D: 절편 보정(직전 8개 분기 평균 오차를 더함) — 실시간에도 쓸 수 있는 정보만 사용
+        for k in range(4):
+            err = df["actual"] - df[f"k{k}"]
+            corr = df[f"k{k}"] + err.shift(1).rolling(8, min_periods=4).mean().fillna(0)
+            e2 = (df["actual"] - corr)
+            r2_all = np.sqrt(np.mean(e2 ** 2)); r2_rec = np.sqrt(np.mean(e2[df["q"] >= "2024Q1"] ** 2))
+            print(f"    [절편 보정] k{k}: 전체 RMSE {r2_all:.3f} · 최근 {r2_rec:.3f}")
         print("    분기별(2025~):", " | ".join(f"{r.q} 실적 {r.actual:+.1f} k3 {r.k3:+.2f}" for r in df[df['q'] >= '2025Q1'].itertuples()))
-    # GDI 항목 탐색(200Y102 주요지표 분기)
-    e = Ecos(key)
-    try:
-        its = [i for i in e.items("200Y102") if "소득" in (i.get("ITEM_NAME") or "")]
-        print("\n### 200Y102 소득 항목:", [(i["ITEM_CODE"], i["ITEM_NAME"], i.get("UNIT_NAME")) for i in its][:20])
-        for i in its[:8]:
-            s = ecos.fetch(key, "200Y102", "Q", "2025Q1", f"{now.year}Q4", [i["ITEM_CODE"]])
-            print("   ", i["ITEM_CODE"], i["ITEM_NAME"], s.tail(3).round(2).to_dict())
-    except Exception as ex:  # noqa: BLE001
-        print("GDI 탐색 실패", type(ex).__name__, ex)
 
 
 if __name__ == "__main__":
