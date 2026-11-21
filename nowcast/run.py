@@ -437,6 +437,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
     if ann:
         rs, ds = annual_sd(year, sd_r), annual_sd(year, sd_d)
         prev_y = chain_annual(year - 1, real_map, defl_map)
+        print(f"::notice::{year}년 실질 {ann['real']:.2f}% (±{rs:.2f}) · 명목 {ann['nominal']:.2f}% (±{np.hypot(rs, ds):.2f}) · 디플레이터 ±{ds:.2f}")
         path = []
         for qq in pd.period_range(f"{year}Q1", f"{year}Q4", freq="Q"):
             rv, dv = real_map[qq], defl_map[qq]
