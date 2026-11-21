@@ -1,6 +1,7 @@
 # D램 현물 세션 평균가(달러/개). 자동 수집: nowcast/dram_spot.py (트렌드포스 DRAM Spot Price 표)
 # 초기값: DDR4 8Gb 2025-11~2026-11-03은 capitalandcompute.net 정리본(원자료 TrendForce·DRAMeXchange),
 #         2026-11-05는 TrendForce 인용 보도, 2026-11-13은 트렌드포스 표
+#         DDR5 16Gb 10/22·11/02 memoryindex.io, 10/27 binmage.com, 11/06 nexus-compute.com, 11/11 fourweekmba.com이 인용한 TrendForce 세션 평균
 date,item,avg,src
 2025-11-12,ddr4_8g,12.18,capitalandcompute
 2025-11-18,ddr4_8g,12.76,capitalandcompute
@@ -48,3 +49,10 @@ date,item,avg,src
 2026-11-20,ddr5_16g,60.667,trendforce
 2026-11-20,ddr4_16g,78.625,trendforce
 2026-11-20,ddr4_8g,43.75,trendforce
+2026-10-22,ddr5_16g,61.1,trendforce-via-memoryindex
+2026-10-27,ddr5_16g,61.333,trendforce-via-binmage
+2026-11-02,ddr5_16g,61.26,trendforce-via-memoryindex
+2026-11-06,ddr5_16g,60.167,trendforce-via-nexus
+2026-11-11,ddr5_16g,60.233,trendforce-via-fourweekmba
+2026-11-11,ddr4_16g,79.867,trendforce-via-fourweekmba
+2026-11-11,ddr4_8g,44.893,trendforce-via-fourweekmba

@@ -235,30 +235,32 @@ def section(data_dir: Path, chip_trend: float | None = None) -> dict | None:
 
 
 def long_term(path: Path = HIST, spot_path: Path | None = None) -> dict | None:
-    """DDR4 8Gb 장기 시계열(월): 계약가(월평균, 트렌드포스 계약가 표 자동 추가) · 현물(정리본 + 일별 수집의 월말 값)."""
+    """장기 시계열(월). DDR5 16Gb(대표): 현물·계약 앵커 + 일별 수집 월말 값. DDR4 8Gb(참고): 계약가(트렌드포스 자동 추가)·현물."""
     if not path.exists():
         return None
     df = pd.read_csv(path, comment="#", dtype={"date": str, "item": str})
     if df.empty:
         return None
     out = {}
-    for item, key in (("ddr4_8g_contract", "contract"), ("ddr4_8g_spot", "spot")):
+    for item, key in (("ddr4_8g_contract", "contract"), ("ddr4_8g_spot", "spot"),
+                      ("ddr5_16g_contract", "ddr5_contract"), ("ddr5_16g_spot", "ddr5_spot")):
         d = df[df["item"] == item].sort_values("date")
         out[key] = [{"d": r.date, "v": round(float(r.avg), 3), "src": r.src} for r in d.itertuples()]
     # 현물: 일별 수집 자료가 있는 달은 그 달 마지막 관측값(정리본에 없는 달만)
     sp = load(spot_path or (path.parent / "dram_spot.csv"))
-    sp = sp[sp["item"] == "ddr4_8g"] if not sp.empty else sp
-    if not sp.empty:
-        have = {x["d"][:7] for x in out["spot"]}
-        sp = sp.assign(m=sp["date"].str[:7]).sort_values("date")
-        for m, g in sp.groupby("m"):
+    for daily, key in (("ddr4_8g", "spot"), ("ddr5_16g", "ddr5_spot")):
+        x = sp[sp["item"] == daily] if not sp.empty else sp
+        if x.empty:
+            continue
+        have = {p["d"][:7] for p in out[key]}
+        x = x.assign(m=x["date"].str[:7]).sort_values("date")
+        for m, g in x.groupby("m"):
             if m not in have:
-                out["spot"].append({"d": f"{m}-01", "v": round(float(g["avg"].iloc[-1]), 3), "src": "daily"})
-        out["spot"].sort(key=lambda x: x["d"])
+                out[key].append({"d": f"{m}-01", "v": round(float(g["avg"].iloc[-1]), 3), "src": "daily"})
+        out[key].sort(key=lambda p: p["d"])
     auto = [x["d"][:7] for x in out["contract"] if x["src"] == "trendforce"]
     out["auto_from"] = min(auto) if auto else None
-    return out if out["contract"] or out["spot"] else None
-
+    return out if any(out[k] for k in ("contract", "spot", "ddr5_spot", "ddr5_contract")) else None
 
 def main(argv=None) -> int:
     collect()

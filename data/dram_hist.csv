@@ -2,6 +2,8 @@
 # 출처: ~2026-10 siliconanalysts.com 정리(TrendForce·DRAMeXchange 및 국내 언론 인용). 날짜는 월 1일로 표기.
 # 자동 수집: nowcast/dram_spot.py가 매일 TrendForce 계약가 표(DDR4 8Gb 1Gx8 세션 평균)를 읽어 src=trendforce 줄 추가·갱신
 # 2025-11 현물 15.90은 기존 일별 수집(11/12·11/18 약 12~13달러)과 어긋나 제외함.
+# DDR5 16Gb: 현물 2025-11은 memoryindex.io 전년비 +484%(2026-11-09 60.46)에서 역산, 2026-08은 memorypricechart.com 90일 +14.4%(11/16 60.33)에서 역산.
+#            계약가 2025-10 8.70·2026-09 48은 Team Group 발언(Fortune, 2026-11-10 보도). 2026-10 이후 현물은 일별 수집의 월말 값이 자동으로 붙음.
 date,item,avg,src
 2022-01-01,ddr4_8g_contract,3.41,siliconanalysts
 2022-02-01,ddr4_8g_contract,3.41,siliconanalysts
@@ -66,3 +68,7 @@ date,item,avg,src
 2026-08-01,ddr4_8g_spot,44.37,siliconanalysts
 2026-09-01,ddr4_8g_spot,46.32,siliconanalysts
 2026-10-01,ddr4_8g_spot,46.86,siliconanalysts
+2025-11-01,ddr5_16g_spot,10.35,derived-memoryindex-yoy
+2026-08-01,ddr5_16g_spot,52.74,derived-memorypricechart-90d
+2025-10-01,ddr5_16g_contract,8.7,teamgroup-fortune
+2026-09-01,ddr5_16g_contract,48,teamgroup-fortune
