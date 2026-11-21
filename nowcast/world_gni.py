@@ -76,10 +76,17 @@ IMF_URL = "https://www.imf.org/external/datamapper/api/v1/NGDPDPC/{c}"   # 1인�
 FC_CODES = ["JPN", "CHN", "USA"]
 
 
-def imf_forecast(sess, year: int) -> dict[str, dict]:
+def imf_forecast(sess, year: int, cache: Path | None = None) -> dict[str, dict]:
     """IMF 전망(WEO) 1인당 GDP → 당해 1인당 GNI 추정.
     GNI(당해) = GNI(전년 실적) × (GDP1인당(당해) ÷ GDP1인당(전년))  — 달러 기준 증가율을 그대로 적용.
-    실패하면 빈 dict (그래프에 전망 점이 안 나옴, 나머지는 그대로)."""
+    조회에 성공하면 cache(json)에 저장, 실패한 나라는 cache의 마지막 성공 값을 씀(같은 연도일 때만)."""
+    import json
+    old = {}
+    if cache and cache.exists():
+        try:
+            old = json.loads(cache.read_text())
+        except ValueError:
+            old = {}
     out = {}
     for c in FC_CODES:
         try:
@@ -91,7 +98,17 @@ def imf_forecast(sess, year: int) -> dict[str, dict]:
                 continue
             out[c] = {"y": year, "g": float(g_cur) / float(g_prev), "gdp_pc": float(g_cur)}
         except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError) as e:
-            print(f"::notice::IMF 1인당 GDP 전망 조회 실패({c}) — {type(e).__name__}, 전망 점 생략")
+            o = old.get(c)
+            if o and o.get("y") == year:
+                out[c] = {**o, "cached": True}
+                print(f"::notice::IMF 1인당 GDP 전망 조회 실패({c}) — {type(e).__name__}, 지난번 값 사용({o.get('at', '?')})")
+            else:
+                print(f"::notice::IMF 1인당 GDP 전망 조회 실패({c}) — {type(e).__name__}, 전망 점 생략")
+    if cache and out:
+        from datetime import date
+        save = {**old, **{c: {k: v for k, v in f.items() if k != "cached"} | ({} if f.get("cached") else {"at": date.today().isoformat()})
+                          for c, f in out.items()}}
+        cache.write_text(json.dumps(save, ensure_ascii=False, indent=1))
     if out:
         print("::notice::IMF 1인당 GDP 전망 " + ", ".join(f"{c} {v['gdp_pc']:,.0f}달러({v['y']}, 증가율 {(v['g']-1)*100:+.1f}%)" for c, v in out.items()))
     return out
@@ -114,7 +131,7 @@ def section(data_dir: Path, now: datetime, years: int = 21, sess=None) -> dict |
     # 당해(now.year) 전망: 전년 실적 GNI 1인당 × IMF 1인당 GDP 증가율
     fc = {}
     last_year = now.year - 1
-    for c, f in imf_forecast(sess, now.year).items():
+    for c, f in imf_forecast(sess, now.year, data_dir / "imf_forecast.json").items():
         base = next((p["v"] for p in out.get(c, {}).get("pts", []) if p["y"] == last_year), None)
         if base is not None:
             fc[c] = {"y": now.year, "v": round(base * f["g"]), "g": round((f["g"] - 1) * 100, 1)}
