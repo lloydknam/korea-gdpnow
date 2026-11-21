@@ -220,7 +220,16 @@ def section(data_dir: Path, chip_trend: float | None = None) -> dict | None:
         return None
     return {"series": series, "signal": sig, "level": level, "text": text, "lead": LEAD if lead is not None else None,
             "hist": long_term(data_dir / "dram_hist.csv"),
+            "gpu": _gpu(data_dir),
             "src": "TrendForce·DRAMeXchange 현물 세션 평균가(달러/개)"}
+
+
+def _gpu(data_dir: Path):
+    try:
+        from . import gpu_rent
+        return gpu_rent.section(data_dir)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def long_term(path: Path = HIST, spot_path: Path | None = None) -> dict | None:
@@ -254,6 +263,11 @@ def long_term(path: Path = HIST, spot_path: Path | None = None) -> dict | None:
 def main(argv=None) -> int:
     collect()
     collect_contract()
+    try:
+        from . import gpu_rent
+        gpu_rent.collect()
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::GPU 임대료 수집 생략 — {type(e).__name__} {e}")
     return 0
 
 

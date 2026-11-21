@@ -165,6 +165,13 @@ dialog.chg::backdrop{background:rgba(20,24,29,.45)}
 .spot{margin-top:16px;border:1px solid var(--rule);border-radius:10px;padding:12px 12px 6px}
 .spot-h{display:flex;align-items:center;gap:8px;font-size:14px}
 .spot-h5{font-size:13px;font-weight:700;color:var(--ink-2);margin:16px 0 4px}
+.gpu-r{display:flex;align-items:baseline;gap:10px;font-size:13.5px;padding:3px 0;flex-wrap:wrap}
+.gpu-r b{min-width:42px}
+.gpu-d{font-weight:700}
+.gpu-d.up{color:var(--neg)}
+.gpu-d.dn{color:var(--main)}
+.gpu-h{font-size:11px;color:var(--ink-3);letter-spacing:1px}
+.gpu-r a{font-size:12px;color:var(--main);text-decoration:none;border-bottom:1px solid var(--grid)}
 .spot-badge{font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:999px;color:#fff;background:var(--cmp2)}
 .spot-badge.sb-warn{background:var(--neg)} .spot-badge.sb-watch{background:var(--s4)} .spot-badge.sb-up{background:var(--s3)}
 .spot-t{font-size:13px;margin:6px 0 8px;color:var(--ink)}
@@ -311,6 +318,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
       <div class="chart" id="c-spot"></div>
       <div id="spot-tbl"></div>
       <p class="note" id="spot-note"></p>
+      <div class="gpu" id="gpu-box" hidden></div>
       <h3 class="spot-h5">DDR5 16Gb 장기 추이 (달러 · 로그 눈금)</h3>
       <div class="legend" id="spot5-legend"></div>
       <div class="chart" id="c-spot5"></div>
@@ -986,6 +994,26 @@ function renderSpot() {
     "현물가는 유통시장 시세로 대형 고객 계약가(한은 수출물가에 반영)보다 1~3개월 먼저 움직임 → 모형 계산엔 넣지 않고 경고용으로만 표시 · " +
     "대표지표 = DDR5 16Gb(최신 서버·PC 주메모리, AI 서버 CPU 쪽) · GPU에 붙는 HBM은 연간 계약이라 현물 시세가 없음";
   renderSpotLong(S);
+  renderGpu(S.gpu);
+}
+
+function renderGpu(G) {
+  const box = $("#gpu-box"); if (!box) return; box.replaceChildren();
+  box.hidden = !G || !Object.keys(G.items || {}).length; if (box.hidden) return;
+  box.appendChild(h("h3", "spot-h5", "AI 수요 온도계 · GPU 임대료 (1주 전 대비)"));
+  Object.values(G.items).forEach(x => {
+    const row = h("div", "gpu-r");
+    const arrow = x.dir > 0 ? "▲ 상승" : x.dir < 0 ? "▼ 하락" : "– 보합";
+    row.appendChild(h("b", "", x.label));
+    row.appendChild(h("span", "gpu-d " + (x.dir > 0 ? "up" : x.dir < 0 ? "dn" : ""), `${arrow}${x.dir ? " (" + x.size + ")" : ""}`));
+    const st = h("span", "gpu-h"); st.textContent = x.hist.map(p => p.dir > 0 ? "▲" : p.dir < 0 ? "▼" : "–").join("");
+    st.title = "최근 기록(왼쪽이 과거)"; row.appendChild(st);
+    const a = h("a", "", "값 보기 ↗"); a.href = x.url; a.target = "_blank"; a.rel = "noopener"; row.appendChild(a);
+    box.appendChild(row);
+  });
+  const d = Object.values(G.items).map(x => x.date).sort().at(-1);
+  box.appendChild(h("p", "note", `${d} 기준 · 출처: ${G.src} · AI 가속기(GPU)를 빌리는 시간당 가격 → 오르면 AI 연산 수요가 공급보다 빡빡하다는 뜻 · ` +
+    "상업 지수라 값은 싣지 않고 1주 변화의 방향과 크기(소폭 <5%, 큰 폭 <15%, 급격히 ≥15%)만 표시 · 막대 옆 기호는 날짜별 기록"));
 }
 
 function renderSpotLong(S) {
