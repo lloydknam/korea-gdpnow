@@ -68,12 +68,14 @@ jobs:
         run: python -m nowcast.run
 
       # 사이트를 먼저 배포 → 아래 커밋이 실패해도 페이지는 갱신됨
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+      # 11/21 v6·v5·v5 조합에서 '아티팩트 없음' 배포 실패가 반복돼, 몇 주간 문제없던 조합으로 되돌림
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: site
       - id: deploy
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4
+        continue-on-error: true   # 배포가 실패해도 아래 state 저장은 진행
 
       # 발표일이 지났는데 안 들어온 자료 → GitHub 이슈로 알림(해소되면 자동 종료)
       - name: Data alerts
@@ -83,6 +85,7 @@ jobs:
         run: python -m nowcast.alert_issue
 
       - name: Commit state & history
+        if: always()
         run: |
           git config user.name "gdpnow-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
