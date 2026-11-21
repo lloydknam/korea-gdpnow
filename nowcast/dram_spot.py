@@ -28,6 +28,7 @@ ITEMS = {  # 키: (세대, 용량, 구성) — 속도 표기(4800/5600, 3200)가
     "ddr4_8g": ("DDR4", "8", "1Gx8"),
 }
 LABELS = {"ddr5_16g": "DDR5 16Gb", "ddr4_16g": "DDR4 16Gb", "ddr4_8g": "DDR4 8Gb"}
+LEAD = "ddr5_16g"   # 대표지표(경고 판정 기준)
 NUM = r"([\d,]+(?:\.\d+)?)"
 
 
@@ -187,22 +188,48 @@ def section(data_dir: Path, chip_trend: float | None = None) -> dict | None:
                     "d30": None if not c30 else round((last / c30 - 1) * 100, 2)})
     if not sig:
         return None
-    # 판정: 1개월 변화가 있는 품목 중 가장 나쁜 쪽 기준(보수적으로 경고)
-    have30 = [x for x in sig if x["d30"] is not None]
-    worst = min(have30, key=lambda x: x["d30"]) if have30 else None
-    if worst is None:
-        level, text = "na", "1개월 비교 자료 쌓이는 중"
-    elif worst["d30"] <= -3:
-        level, text = "warn", f"{worst['label']} 현물 1개월 {worst['d30']:+.1f}% → 1~3개월 뒤 계약가·수출물가 둔화 가능"
-    elif worst["d30"] < 0 or any((x["d7"] or 0) <= -1.5 for x in sig):
-        level, text = "watch", f"{worst['label']} 현물 1개월 {worst['d30']:+.1f}% → 상승 탄력 약화, 지켜볼 구간"
-    elif worst["d30"] >= 3:
-        level, text = "up", f"현물 1개월 {worst['d30']:+.1f}% 이상 상승 → 계약가 추가 상승 여지"
+    # 대표지표 = DDR5 16Gb(최신 서버·PC 주메모리, AI 서버 CPU 쪽). DDR4는 단종으로 공급이 줄어
+    # 가격이 AI 수요보다 공급 요인에 크게 좌우 → 참고용. 1개월 자료가 없으면 수집 시작일 대비 변화(7일 이상일 때)
+    lead = next((x for x in sig if x["k"] == LEAD), None)
+    if lead is not None:
+        s = df[df["item"] == LEAD].drop_duplicates("date", keep="last").set_index("date")["avg"].sort_index()
+        span = (s.index.max() - s.index.min()).days
+        if lead["d30"] is not None:
+            lead["chg"], lead["win"] = lead["d30"], "1개월"
+        elif span >= 7:
+            lead["chg"], lead["win"] = round((float(s.iloc[-1]) / float(s.iloc[0]) - 1) * 100, 2), f"{span}일"
+        else:
+            lead = None
+    old = next((x for x in sig if x["k"] == "ddr4_8g" and x["d30"] is not None), None)
+    ref = f" · 참고: 구형 DDR4 8Gb 1개월 {old['d30']:+.1f}%(단종 공급 요인 영향 큼)" if old and lead else ""
+    if lead is not None:
+        c, w, lab = lead["chg"], lead["win"], lead["label"]
+        if c <= -3:
+            level, text = "warn", f"{lab} 현물 {w} {c:+.1f}% → 1~3개월 뒤 계약가·수출물가 둔화 가능"
+        elif c < 0 or (lead["d7"] or 0) <= -1.5:
+            level, text = "watch", f"{lab} 현물 {w} {c:+.1f}% → 상승 탄력 약화, 지켜볼 구간"
+        elif c >= 3:
+            level, text = "up", f"{lab} 현물 {w} {c:+.1f}% → 계약가 추가 상승 여지"
+        else:
+            level, text = "flat", f"{lab} 현물 {w} {c:+.1f}% 안팎 보합"
+        text += ref
     else:
-        level, text = "flat", f"현물 1개월 {worst['d30']:+.1f}% 안팎 보합"
+        # DDR5 자료가 아직 짧으면: 1개월 변화가 있는 품목 중 가장 나쁜 쪽(보수적으로 경고)
+        have30 = [x for x in sig if x["d30"] is not None]
+        worst = min(have30, key=lambda x: x["d30"]) if have30 else None
+        if worst is None:
+            level, text = "na", "1개월 비교 자료 쌓이는 중"
+        elif worst["d30"] <= -3:
+            level, text = "warn", f"{worst['label']} 현물 1개월 {worst['d30']:+.1f}% → 1~3개월 뒤 계약가·수출물가 둔화 가능"
+        elif worst["d30"] < 0 or any((x["d7"] or 0) <= -1.5 for x in sig):
+            level, text = "watch", f"{worst['label']} 현물 1개월 {worst['d30']:+.1f}% → 상승 탄력 약화, 지켜볼 구간"
+        elif worst["d30"] >= 3:
+            level, text = "up", f"현물 1개월 {worst['d30']:+.1f}% 이상 상승 → 계약가 추가 상승 여지"
+        else:
+            level, text = "flat", f"현물 1개월 {worst['d30']:+.1f}% 안팎 보합"
     if chip_trend is not None and level in ("warn", "watch") and chip_trend > 0:
         text += f" · 모형은 수출물가 월 {chip_trend:+.1f}% 추세 연장 중"
-    return {"series": series, "signal": sig, "level": level, "text": text,
+    return {"series": series, "signal": sig, "level": level, "text": text, "lead": LEAD if lead is not None else None,
             "hist": long_term(data_dir / "dram_hist.csv"),
             "src": "TrendForce·DRAMeXchange 현물 세션 평균가(달러/개)"}
 
