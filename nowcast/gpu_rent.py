@@ -25,7 +25,9 @@ KST = timezone(timedelta(hours=9))
 def parse(page: str, ticker: str) -> tuple[int, float] | None:
     """페이지 원문(HTML 또는 웹 리더 마크다운) → (방향 +1/−1/0, 1주 변화 %의 절댓값).
     메뉴에도 티커가 나오므로 '…%vs 7D' 표시마다 바로 앞에서 가장 가까운 티커를 찾아 짝지음."""
-    for m in re.finditer(r"([+\-−]?)(\d+(?:\.\d+)?)\s*%\s*(?:<[^>]*>\s*)*vs\s*7\s*D", page, re.I):
+    page = re.sub(r"<!--.*?-->", "", page, flags=re.S)   # React 등이 숫자 사이에 끼우는 주석 제거
+    T = r"(?:\s|<[^>]*>)*"
+    for m in re.finditer(r"([+\-−]?)(\d+(?:\.\d+)?)" + T + "%" + T + r"vs" + T + r"7\s*D", page, re.I):
         pre = page[max(0, m.start() - 2500):m.start()]
         tks = list(re.finditer(r"SD[A-Z0-9]+RT", pre))
         if not tks or tks[-1][0] != ticker:
@@ -63,9 +65,9 @@ def collect(path: Path = CSV, sess=None, now: datetime | None = None) -> int:
             continue
         p = parse(page, tk)
         if not p:
-            j = page.find(tk)
-            print(f"::warning::GPU 임대료({g}) 표를 못 읽음 — 부분: {page[max(j, 0):max(j, 0) + 160]!r}" if j >= 0
-                  else f"::warning::GPU 임대료({g}) 페이지에 {tk} 없음")
+            j = page.find("7D")
+            print(f"::warning::GPU 임대료({g}) 표를 못 읽음 — '7D' 앞부분: {page[max(j - 700, 0):j + 20]!r}" if j >= 0
+                  else f"::warning::GPU 임대료({g}) 페이지에 '7D' 없음(길이 {len(page)})")
             continue
         rows.append({"date": day, "item": k, "dir": p[0], "chg7": round(p[1], 1)})
         print(f"GPU 임대료 {g}: 1주 {'▲' if p[0] > 0 else '▼' if p[0] < 0 else '–'} {bucket(p[1])}")
