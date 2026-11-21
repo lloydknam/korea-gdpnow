@@ -311,7 +311,7 @@ footer{border-top:1px solid var(--rule);padding-top:18px;text-align:center}
       <div class="chart" id="c-spot"></div>
       <div id="spot-tbl"></div>
       <p class="note" id="spot-note"></p>
-      <h3 class="spot-h5">메모리 장기 추이 (달러 · 로그 눈금) — DDR5 대표, DDR4 참고</h3>
+      <h3 class="spot-h5">DDR5 16Gb 장기 추이 (달러 · 로그 눈금)</h3>
       <div class="legend" id="spot5-legend"></div>
       <div class="chart" id="c-spot5"></div>
       <p class="note" id="spot5-note"></p>
@@ -950,41 +950,41 @@ function renderSpot() {
         " · 실질·환율은 그대로 둔 단순 계산";
     }
   }
-  const KEYS = [["ddr5_16g", "DDR5 16Gb", "--s1"], ["ddr4_16g", "DDR4 16Gb", "--s2"], ["ddr4_8g", "DDR4 8Gb", "--cmp1"]].filter(([k]) => S.series[k]);
+  const KEYS = [["ddr5_16g", "DDR5 16Gb", "--s1"]].filter(([k]) => S.series[k]);
   const lg = $("#spot-legend"); lg.replaceChildren();
   KEYS.forEach(([k, lab, c]) => { const sp = h("span"), ky = h("i", "key line"); ky.style.borderColor = css(c);
-    sp.append(ky, lab + (k === (S.lead || "ddr5_16g") ? " (대표)" : k.startsWith("ddr4") ? " (구형·참고)" : "")); lg.appendChild(sp); });
-  // 그래프: 최근 1년, 품목별 가격 수준이 달라 지수화(품목별 최신값 = 100) → 과거가 지금보다 얼마나 높았나/낮았나
+    sp.append(ky, lab + " 현물(달러/개)"); lg.appendChild(sp); });
+  // 그래프: DDR5 16Gb 현물가(달러) — 수집된 기간(최대 1년)만, 날짜 축은 자료 구간에 맞춤
   const box = $("#c-spot"); box.replaceChildren();
-  const end = new Date(Math.max(...KEYS.map(([k]) => +new Date(S.series[k].at(-1).d)))), t0 = +end - 365 * 864e5;
-  const ser = KEYS.map(([k, lab, c]) => {
-    const pts = S.series[k].filter(p => +new Date(p.d) >= t0); const b0 = pts.length ? pts.at(-1).v : null;
-    return { k, lab, c, pts: pts.map(p => ({ t: +new Date(p.d), v: p.v, i: p.v / b0 * 100 })) };
-  }).filter(s => s.pts.length);
-  const W = box.clientWidth || 340, H = 160, m = { t: 10, r: 44, b: 22, l: 34 };
-  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "D램 현물가 추이(지수)" }, box);
-  const all = ser.flatMap(s => s.pts.map(p => p.i)), ticks = niceTicks(Math.min(...all), Math.max(...all), 4);
-  const X = t => m.l + (W - m.l - m.r) * (t - t0) / (+end - t0);
+  const ser = KEYS.map(([k, lab, c]) => ({ k, lab, c, pts: S.series[k].map(p => ({ t: +new Date(p.d), v: p.v })) })).filter(s => s.pts.length);
+  if (!ser.length) return;
+  const end = Math.max(...ser.flatMap(s => s.pts.map(p => p.t)));
+  const t0 = Math.max(end - 365 * 864e5, Math.min(...ser.flatMap(s => s.pts.map(p => p.t))) - 2 * 864e5);
+  ser.forEach(s => { s.pts = s.pts.filter(p => p.t >= t0); });
+  const W = box.clientWidth || 340, H = 160, m = { t: 10, r: 16, b: 22, l: 38 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "DDR5 16Gb 현물가 추이" }, box);
+  const all = ser.flatMap(s => s.pts.map(p => p.v)), lo = Math.min(...all), hi = Math.max(...all), pad = Math.max((hi - lo) * 0.3, hi * 0.01);
+  const ticks = niceTicks(lo - pad, hi + pad, 4);
+  const X = t => m.l + (W - m.l - m.r) * (t - t0) / Math.max(end - t0, 1);
   const Y = v => m.t + (H - m.t - m.b) * (1 - (v - ticks[0]) / (ticks.at(-1) - ticks[0]));
-  grid(svg, ticks, Y, m.l, W - m.r);
+  ticks.forEach(tk => { el("line", { x1: m.l, x2: W - m.r, y1: Y(tk), y2: Y(tk), stroke: css("--grid") }, svg);
+    txt(svg, m.l - 6, Y(tk) + 3.5, "$" + (+tk.toFixed(1)), { "text-anchor": "end" }); });
   ser.forEach(s => {
-    const isLead = s.k === (S.lead || "ddr5_16g");
-    el("path", { d: s.pts.map((p, i) => `${i ? "L" : "M"}${X(p.t)},${Y(p.i)}`).join(""), fill: "none", stroke: css(s.c), "stroke-width": isLead ? 3 : 1.6, opacity: isLead ? 1 : .65, "stroke-linejoin": "round" }, svg);
-    // 실제 관측치마다 점(1년치는 관측 간격이 길어 선이 끊겨 보이는 구간이 있음), 최신값은 큰 점
-    s.pts.forEach(p => el("circle", { cx: X(p.t), cy: Y(p.i), r: 1.8, fill: css(s.c), opacity: .8 }, svg));
-    const L = s.pts.at(-1); el("circle", { cx: X(L.t), cy: Y(L.i), r: 3.5, fill: css(s.c), stroke: css("--bg"), "stroke-width": 1.5 }, svg);
+    el("path", { d: s.pts.map((p, i) => `${i ? "L" : "M"}${X(p.t)},${Y(p.v)}`).join(""), fill: "none", stroke: css(s.c), "stroke-width": 2.6, "stroke-linejoin": "round" }, svg);
+    s.pts.forEach(p => el("circle", { cx: X(p.t), cy: Y(p.v), r: 2, fill: css(s.c), opacity: .85 }, svg));
+    const L = s.pts.at(-1); el("circle", { cx: X(L.t), cy: Y(L.v), r: 3.8, fill: css(s.c), stroke: css("--bg"), "stroke-width": 1.5 }, svg);
   });
-  for (let d = new Date(new Date(t0).getFullYear(), new Date(t0).getMonth() + 1, 1); +d <= +end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1))
-    if (d.getMonth() % 3 === 0) txt(svg, X(+d), H - 6, `${String(d.getFullYear()).slice(2)}.${d.getMonth() + 1}`, { "text-anchor": "middle" });
+  // 날짜 눈금: 구간 길이에 맞춰 대략 4~5개
+  const span = end - t0, step = span > 200 * 864e5 ? 60 : span > 60 * 864e5 ? 14 : 7;
+  for (let t = t0 + 864e5; t <= end; t += step * 864e5) { const d = new Date(t); txt(svg, X(t), H - 6, `${d.getMonth() + 1}/${d.getDate()}`, { "text-anchor": "middle" }); }
   // 표: 품목별 최신가·1주·1개월
   const tb = $("#spot-tbl"); tb.replaceChildren();
-  tb.appendChild(smallTable(["품목", "현물가($)", "1주", "1개월"], S.signal.map(x => [x.label + (x.k === S.lead ? " ★" : ""), x.last.toFixed(2),
+  tb.appendChild(smallTable(["품목", "현물가($)", "1주", "1개월"], S.signal.map(x => [x.label, x.last.toFixed(2),
     x.d7 == null ? "–" : fmt(x.d7, 1) + "%", x.d30 == null ? "–" : fmt(x.d30, 1) + "%"])));
   const last = S.signal.map(x => x.date).sort().at(-1);
-  $("#spot-note").textContent = `그래프 = 최근 1년, 품목별 최신값 100 기준 지수(100보다 위 = 지금보다 비쌌던 때) · 점 = 실제 수집일 · ${last} 기준 · 출처: ${S.src} · ` +
+  $("#spot-note").textContent = `그래프 = DDR5 16Gb 현물 세션 평균가(수집된 기간, 최대 1년) · 점 = 실제 관측일 · ${last} 기준 · 출처: ${S.src} · ` +
     "현물가는 유통시장 시세로 대형 고객 계약가(한은 수출물가에 반영)보다 1~3개월 먼저 움직임 → 모형 계산엔 넣지 않고 경고용으로만 표시 · " +
-    "경고 판정 = ★ DDR5 16Gb(최신 서버·PC 주메모리, AI 서버 CPU 쪽). DDR4는 단종으로 공급이 줄어 가격이 AI 수요보다 공급 요인에 크게 좌우돼 참고용. " +
-    "GPU에 붙는 HBM은 연간 계약이라 현물가가 없음";
+    "대표지표 = DDR5 16Gb(최신 서버·PC 주메모리, AI 서버 CPU 쪽) · GPU에 붙는 HBM은 연간 계약이라 현물 시세가 없음";
   renderSpotLong(S);
 }
 
@@ -993,7 +993,7 @@ function renderSpotLong(S) {
   box.replaceChildren(); nt.textContent = ""; if (lg) lg.replaceChildren();
   const pts = a => (a || []).map(p => ({ t: +new Date(p.d), v: p.v, src: p.src }));
   const C = pts(H5 && H5.contract), P = pts(H5 && H5.spot), C5 = pts(H5 && H5.ddr5_contract), P5 = pts(H5 && H5.ddr5_spot);
-  const all = [...C, ...P, ...C5, ...P5];
+  const all = [...C5, ...P5];
   if (!all.length) { box.hidden = true; nt.hidden = true; return; }
   box.hidden = false; nt.hidden = false;
   const t0 = Math.min(...all.map(p => p.t)), t1 = Math.max(...all.map(p => p.t));
@@ -1014,17 +1014,14 @@ function renderSpotLong(S) {
     stroke: css(c), "stroke-width": w, opacity: op, "stroke-linejoin": "round", ...(dash ? { "stroke-dasharray": dash } : {}) }, svg);
   const dots = (A, c, r, op, hollowDerived) => A.forEach(p => el("circle", { cx: X(p.t), cy: Y(p.v), r,
     fill: hollowDerived && String(p.src).startsWith("derived") ? css("--bg") : css(c), stroke: css(c), "stroke-width": 1.4, opacity: op }, svg));
-  // 참고: DDR4 8Gb(구형) — 흐리게
-  line(C, "--cmp1", 1.4, .55); dots(P, "--cmp2", 2.2, .7);
   // 대표: DDR5 16Gb — 현물 실선·점(역산값은 속 빈 점), 계약가 점선
   line(C5, "--s1", 1.8, .9, "4 3"); dots(C5, "--s1", 2.6, .9);
   line(P5, "--s1", 2.8, 1); dots(P5, "--s1", 3.2, 1, true);
-  if (lg) [["--s1", "DDR5 16Gb 현물 (대표)", ""], ["--s1", "DDR5 16Gb 계약가", "dash"], ["--cmp1", "DDR4 8Gb 계약가 (구형·참고)", ""], ["--cmp2", "DDR4 8Gb 현물 (점)", ""]]
+  if (lg) [["--s1", "현물", ""], ["--s1", "계약가", "dash"]]
     .forEach(([c, lab, d]) => { const sp = h("span"), ky = h("i", "key line"); ky.style.borderColor = css(c); if (d) ky.style.borderTopStyle = "dashed"; sp.append(ky, lab); lg.appendChild(sp); });
   const f = A => A.length ? `${A[0].v.toFixed(1)}달러(${new Date(A[0].t).getFullYear() % 100}.${new Date(A[0].t).getMonth() + 1}) → ${A.at(-1).v.toFixed(1)}달러` : "";
   nt.textContent = `DDR5 16Gb 현물 ${f(P5)} · 계약가 ${f(C5)} · 로그 눈금 · 속 빈 점 = 다른 시점 값과 증감률로 역산한 값 · ` +
-    "DDR5 장기 자료는 무료 공개 자료가 드물어 몇 개 시점(memoryindex·memorypricechart 역산, Team Group 발언)만 있고 2026.10부터는 매일 수집 · " +
-    `DDR4 8Gb 계약가는 2022~${C.length ? new Date(C.at(-1).t).getFullYear() + "." + (new Date(C.at(-1).t).getMonth() + 1) : ""}(siliconanalysts.com 정리본 + TrendForce 계약가 표 자동 추가)`;
+    "무료 공개 자료가 드물어 2026.10 이전은 몇 개 시점(memoryindex·memorypricechart 역산, Team Group 발언)만 있고, 그 사이는 실제 경로가 아닌 직선 연결 · 2026.10부터는 매일 수집";
 }
 
 // ================================================================ 품목별 수출액: 연간 누적 영역
@@ -1537,9 +1534,9 @@ function renderMethod() {
       "환율: 원/달러 매매기준율 일별 평균, 당해 남은 영업일은 최근 5영업일 평균 유지 · 전년 실적·추계인구: 한은 ECOS 주요지표(연간)",
       "범위 = 명목 성장률 오차범위만 반영(환율 변동은 미반영)"]],
     DATA.dram_spot && ["선행 경고: D램 현물가", [
-      "트렌드포스(DRAMeXchange) DRAM 현물 세션 평균가를 매 실행 수집 → data/dram_spot.csv (DDR5 16Gb·DDR4 16Gb·DDR4 8Gb)",
+      "트렌드포스(DRAMeXchange) DRAM 현물 세션 평균가를 매 실행 수집 → data/dram_spot.csv · 표시는 DDR5 16Gb만",
       "판정: 대표지표 DDR5 16Gb의 1개월(28일) 변화(자료가 1개월 안 되면 수집 시작일 대비, 7일 이상일 때) → −3% 이하 경고, 0% 미만 또는 1주 −1.5% 이하 주의, +3% 이상 상승, 그 외 보합",
-      "DDR4는 참고용: 제조사들이 생산라인을 HBM·DDR5로 돌리며 단종 수순 → 공급 감소로 가격이 AI 수요보다 공급 요인에 크게 좌우. GPU에 붙는 HBM은 연간 계약이라 현물 시세 없음",
+      "DDR4는 표시하지 않음: 제조사들이 생산라인을 HBM·DDR5로 돌리며 단종 수순 → 가격이 AI 수요보다 단종 공급 요인에 크게 좌우돼 신호를 왜곡. GPU에 붙는 HBM은 연간 계약이라 현물 시세 없음",
       "모형 계산엔 안 넣음 → 현물이 꺾이면 1~3개월 뒤 계약가·한은 수출물가가 둔화할 수 있다는 신호로만 사용"]],
     DATA.exports && ["부가: 품목별 수출액", [
       "관세청 품목별 수출입실적(공공데이터포털 API, 매월 15일경 전월 확정치) → 품목군 = HS 코드 묶음, 전체 = HS 2단위 류 합",

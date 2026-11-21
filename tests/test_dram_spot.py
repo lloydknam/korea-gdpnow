@@ -47,17 +47,19 @@ def test():
     assert ds.collect(p, Direct()) == 3 and ds.collect(p, Direct()) == 0   # 같은 날 중복 안 붙음
     assert ds.collect(p, Blocked()) == 2                                   # 웹 리더 경유
     o = ds.section(d, 3.8)
-    s8 = next(x for x in o["signal"] if x["k"] == "ddr4_8g")
-    assert s8["last"] == 44.1 and s8["d30"] < -3 and o["level"] == "warn" and "월 +3.8%" in o["text"], o
+    # 표시·판정은 DDR5만(DDR4는 수집만): DDR5 자료가 하루치뿐이라 아직 판정 안 함
+    assert set(o["series"]) == {"ddr5_16g"} and [x["k"] for x in o["signal"]] == ["ddr5_16g"], o
+    assert o["level"] == "na" and o["lead"] is None, o
     assert ds.section(Path(tempfile.mkdtemp())) is None
     # DDR5가 대표지표: 7일 이상 자료면 DDR5로 판정, DDR4는 참고로만
     d5 = Path(tempfile.mkdtemp())
     (d5 / "dram_spot.csv").write_text("date,item,avg,src\n2026-10-01,ddr4_8g,47,t\n2026-11-01,ddr4_8g,44,t\n"
                                       "2026-11-01,ddr5_16g,60,t\n2026-11-15,ddr5_16g,60.5,t\n")
     o5 = ds.section(d5, 3.8)
-    assert o5["lead"] == "ddr5_16g" and o5["level"] == "flat" and "DDR5 16Gb 현물 14일" in o5["text"] and "참고: 구형 DDR4" in o5["text"], o5
+    assert o5["lead"] == "ddr5_16g" and o5["level"] == "flat" and "DDR5 16Gb 현물 14일" in o5["text"] and "DDR4" not in o5["text"], o5
     (d5 / "dram_spot.csv").write_text("date,item,avg,src\n2026-11-01,ddr5_16g,60,t\n2026-11-15,ddr5_16g,57.5,t\n")
-    assert ds.section(d5, 3.8)["level"] == "warn"
+    o6 = ds.section(d5, 3.8)
+    assert o6["level"] == "warn" and "월 +3.8%" in o6["text"], o6
     # 계약가 표 → dram_hist.csv 자동 추가·같은 달 교체
     C1 = """DRAM Contract Price (2H Oct) Last Update 2026-10-30 17:00 (GMT+8)
 | Item | Session High | Session Low | Session Average | Average Change | Low Change |

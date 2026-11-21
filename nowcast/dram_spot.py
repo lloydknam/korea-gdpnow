@@ -200,8 +200,6 @@ def section(data_dir: Path, chip_trend: float | None = None) -> dict | None:
             lead["chg"], lead["win"] = round((float(s.iloc[-1]) / float(s.iloc[0]) - 1) * 100, 2), f"{span}일"
         else:
             lead = None
-    old = next((x for x in sig if x["k"] == "ddr4_8g" and x["d30"] is not None), None)
-    ref = f" · 참고: 구형 DDR4 8Gb 1개월 {old['d30']:+.1f}%(단종 공급 요인 영향 큼)" if old and lead else ""
     if lead is not None:
         c, w, lab = lead["chg"], lead["win"], lead["label"]
         if c <= -3:
@@ -212,23 +210,14 @@ def section(data_dir: Path, chip_trend: float | None = None) -> dict | None:
             level, text = "up", f"{lab} 현물 {w} {c:+.1f}% → 계약가 추가 상승 여지"
         else:
             level, text = "flat", f"{lab} 현물 {w} {c:+.1f}% 안팎 보합"
-        text += ref
     else:
-        # DDR5 자료가 아직 짧으면: 1개월 변화가 있는 품목 중 가장 나쁜 쪽(보수적으로 경고)
-        have30 = [x for x in sig if x["d30"] is not None]
-        worst = min(have30, key=lambda x: x["d30"]) if have30 else None
-        if worst is None:
-            level, text = "na", "1개월 비교 자료 쌓이는 중"
-        elif worst["d30"] <= -3:
-            level, text = "warn", f"{worst['label']} 현물 1개월 {worst['d30']:+.1f}% → 1~3개월 뒤 계약가·수출물가 둔화 가능"
-        elif worst["d30"] < 0 or any((x["d7"] or 0) <= -1.5 for x in sig):
-            level, text = "watch", f"{worst['label']} 현물 1개월 {worst['d30']:+.1f}% → 상승 탄력 약화, 지켜볼 구간"
-        elif worst["d30"] >= 3:
-            level, text = "up", f"현물 1개월 {worst['d30']:+.1f}% 이상 상승 → 계약가 추가 상승 여지"
-        else:
-            level, text = "flat", f"현물 1개월 {worst['d30']:+.1f}% 안팎 보합"
+        level, text = "na", f"{LABELS[LEAD]} 비교 자료 쌓이는 중(7일 이상 필요)"
     if chip_trend is not None and level in ("warn", "watch") and chip_trend > 0:
         text += f" · 모형은 수출물가 월 {chip_trend:+.1f}% 추세 연장 중"
+    series = {k: v for k, v in series.items() if k == LEAD}
+    sig = [x for x in sig if x["k"] == LEAD]
+    if not series:
+        return None
     return {"series": series, "signal": sig, "level": level, "text": text, "lead": LEAD if lead is not None else None,
             "hist": long_term(data_dir / "dram_hist.csv"),
             "src": "TrendForce·DRAMeXchange 현물 세션 평균가(달러/개)"}
