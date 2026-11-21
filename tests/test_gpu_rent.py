@@ -7,8 +7,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nowcast import gpu_rent as g  # noqa: E402
 
-H100 = '<h3>H100<span>(SDH100RT)</span></h3><p>$3.08</p><img src="/i/hub-arrow-up.svg"><span>6.9%</span><span>vs 7D</span>'
-B200 = 'B200(SDB200RT) $7.10 ![](https://x/hub-arrow-down.svg) 12.9%vs 7D'
+NAV = '<li><a href="/x"><span>H100 <span>SDH100RT</span></span></a></li><li><span>SDB200RT</span></li>'
+H100 = NAV + '<h3>H100<span>(SDH100RT)</span></h3><p>$3.08</p><img src="/i/hub-arrow-up.svg"><span>6.9%</span><span>vs 7D</span>'
+B200 = NAV + 'B200(SDB200RT) $7.10 ![](https://x/hub-arrow-down.svg) 12.9%vs 7D'
 
 
 class R:

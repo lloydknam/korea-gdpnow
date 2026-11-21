@@ -23,18 +23,19 @@ KST = timezone(timedelta(hours=9))
 
 
 def parse(page: str, ticker: str) -> tuple[int, float] | None:
-    """페이지 원문(HTML 또는 웹 리더 마크다운) → (방향 +1/−1/0, 1주 변화 %의 절댓값)."""
-    i = page.find(ticker)
-    if i < 0:
-        return None
-    blk = page[i:i + 3000]
-    m = re.search(r"arrow[-_]?(up|down)[\s\S]{0,600}?(\d+(?:\.\d+)?)\s*%\s*(?:<[^>]*>\s*)*vs\s*7\s*D", blk, re.I)
-    if m:
-        return (1 if m[1].lower() == "up" else -1), float(m[2])
-    m = re.search(r"([+\-−]?)(\d+(?:\.\d+)?)\s*%\s*(?:<[^>]*>\s*)*vs\s*7\s*D", blk, re.I)
-    if m:
+    """페이지 원문(HTML 또는 웹 리더 마크다운) → (방향 +1/−1/0, 1주 변화 %의 절댓값).
+    메뉴에도 티커가 나오므로 '…%vs 7D' 표시마다 바로 앞에서 가장 가까운 티커를 찾아 짝지음."""
+    for m in re.finditer(r"([+\-−]?)(\d+(?:\.\d+)?)\s*%\s*(?:<[^>]*>\s*)*vs\s*7\s*D", page, re.I):
+        pre = page[max(0, m.start() - 2500):m.start()]
+        tks = list(re.finditer(r"SD[A-Z0-9]+RT", pre))
+        if not tks or tks[-1][0] != ticker:
+            continue
+        seg = pre[tks[-1].end():]
+        arr = re.findall(r"arrow[-_]?(up|down)", seg, re.I)
         v = float(m[2])
-        return (0 if v == 0 else (-1 if m[1] in "-−" and m[1] else 1)), v
+        if arr:
+            return (1 if arr[-1].lower() == "up" else -1), v
+        return (0 if v == 0 else (-1 if m[1] in ("-", "−") else 1)), v
     return None
 
 
