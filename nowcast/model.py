@@ -173,8 +173,10 @@ def backtest(levels: dict[str, pd.Series], esi, gdp: pd.Series, cfg_model: dict,
         rows.append(row)
         q += 1
     rmse = lambda e: float(np.sqrt(np.mean(np.square(e)))) if e else None
+    recent = 12   # 최근 12개 분기(3년) 오차 — 구조가 바뀐 시기(반도체 급등)의 실제 성능
     return {
         "rmse": {str(k): rmse(v) for k, v in errs.items()},
+        "rmse_recent": {str(k): rmse(v[-recent:]) for k, v in errs.items()},
         "mae": {str(k): float(np.mean(np.abs(v))) if v else None for k, v in errs.items()},
         "ar_rmse": rmse(ar_err),
         "n": len(ar_err),

@@ -1493,9 +1493,12 @@ function renderCal() {
 function renderBT() {
   const b = DATA.backtest, D = DATA.deflator, tbl = $("#bt"); tbl.replaceChildren();
   $("#bt-sub").textContent = `${b.period} 의사 실시간 백테스트(${b.n}개 분기). 분기 내 실적 개월 수별 평균제곱근오차, 전기비 %p`;
-  const hd = h("tr"); ["정보량", "실질 GDP", "디플레이터"].forEach(s => hd.appendChild(h("th", "", s))); tbl.appendChild(hd);
-  ["실적 0개월", "1개월", "2개월", "3개월"].forEach((nm, k) => { const tr = h("tr"); [nm, b.rmse[k]?.toFixed(2), D?.rmse[k]?.toFixed(2)].forEach(s => tr.appendChild(h("td", "", s ?? "–"))); tbl.appendChild(tr); });
-  const tr = h("tr"); ["참고: GDP AR(1)", b.ar_rmse?.toFixed(2), ""].forEach(s => tr.appendChild(h("td", "", s))); tbl.appendChild(tr);
+  const hd = h("tr"); ["정보량", "실질 GDP", "실질(최근 3년)", "범위에 쓰는 값", "디플레이터"].forEach(s => hd.appendChild(h("th", "", s))); tbl.appendChild(hd);
+  ["실적 0개월", "1개월", "2개월", "3개월"].forEach((nm, k) => { const tr = h("tr");
+    [nm, b.rmse[k]?.toFixed(2), b.rmse_recent?.[k]?.toFixed(2), b.rmse_eff?.[k]?.toFixed(2), D?.rmse[k]?.toFixed(2)].forEach(s => tr.appendChild(h("td", "", s ?? "–"))); tbl.appendChild(tr); });
+  const tr = h("tr"); ["참고: GDP AR(1)", b.ar_rmse?.toFixed(2), "", "", ""].forEach(s => tr.appendChild(h("td", "", s))); tbl.appendChild(tr);
+  if (b.rmse_eff) { const nr = h("tr"), td = h("td", "", `범위에 쓰는 값 = max(전체, 최근 3년) × ${b.rt_factor}(백테스트는 개정된 최종 통계라 실제 실시간 오차보다 작게 나옴) · 디플레이터도 같은 방식 · 속보만 나온 분기 실질은 개정 오차 ±${b.rev_sd}%p 추가`);
+    td.colSpan = 5; td.className = "note"; nr.appendChild(td); tbl.appendChild(nr); }
   const act = $("#act"); act.replaceChildren();
   if (DATA.actuals.length) {
     const d = h("details"); d.open = true; d.appendChild(h("summary", "", "실제 속보치와 비교 (실질, 전기비)"));

@@ -159,6 +159,18 @@ def yoy_path(real: dict, defl: dict, sd_r: dict, sd_d: dict, start: str, end: pd
     return out
 
 
+# 불확실성 범위(현실화): 분기 오차 = max(전체 백테스트 RMSE, 최근 12개 분기 RMSE) × 실시간 계수
+#   실시간 계수: 백테스트는 개정된 최종 통계로 계산해 실제 실시간 오차보다 작게 나옴 → 1.25배(문헌상 실시간 오차가 20~30% 큼)
+#   속보만 나온 분기(잠정치 전)의 실질은 개정 오차 0.1%p를 더함
+RT_FACTOR = 1.25
+REV_SD = 0.1
+
+
+def eff_rmse(bt: dict) -> dict:
+    full, rec = bt.get("rmse") or {}, bt.get("rmse_recent") or {}
+    return {k: (max(v, rec.get(k) or 0) * RT_FACTOR if v is not None else None) for k, v in full.items()}
+
+
 def annual_sd(year: int, sd_by_q: dict) -> float:
     """분기 성장률 오차가 연간 성장률에 주는 영향: 당해 p분기 → (5−p)/4, 전년 p분기 → (p−1)/4."""
     v = 0.0
@@ -327,7 +339,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
     for q in target_quarters(gdp, now):
         nc = model.nowcast(levels, esi, q, bridge, mcfg)
         k_known = model.months_known(raw["ip"], q)
-        rmse = bt["rmse"].get(str(k_known)) or bridge["sd"]
+        rmse = eff_rmse(bt).get(str(k_known)) or bridge["sd"] * RT_FACTOR
         real_nc[q] = (nc["value"], rmse, k_known)
         qs = str(q)
         through = {k: f"{meta[k]['actual_last']}|{meta[k]['last']}" for k in keys}
@@ -401,7 +413,7 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
                 v, sd, _ = real_nc[q]
             else:  # 아직 탭에 없는 먼 분기: 지표 전부 AR 외삽
                 far = model.nowcast(levels, esi, q, bridge, mcfg)
-                v, sd = far["value"], bt["rmse"]["0"]
+                v, sd = far["value"], eff_rmse(bt)["0"]
                 cur_rx[q] = {k: float(far["x"][k]) for k in keys}
             real_map[q], sd_r[q] = v, sd
             src.setdefault(q, {})["real"] = "n"
@@ -410,10 +422,15 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
             cur_dx[q] = {k: float(dn["x"][k]) for k in dkeys}
             kd = model.months_known(raw["px"], q)
             defl_map[q] = dn["value"]
-            sd_d[q] = dbt["rmse"].get(str(kd)) or dbridge["sd"]
+            sd_d[q] = eff_rmse(dbt).get(str(kd)) or dbridge["sd"] * RT_FACTOR
             src.setdefault(q, {})["defl"] = "n"
             src[q]["defl_k"] = kd
         q += 1
+
+    # 속보만 나온 분기(명목·잠정치 전)의 실질은 개정될 수 있음 → 개정 오차 반영
+    nom_last = raw["nominal"].dropna().index.max()
+    for qq in [x for x in real_map if x.year in (year, year - 1) and x > nom_last and src.get(x, {}).get("real") != "n"]:
+        sd_r[qq] = REV_SD
 
     annual = None
     ann = chain_annual(year, real_map, defl_map)
@@ -670,7 +687,8 @@ def main(fetcher=None, now: datetime | None = None, out_dir: Path | None = None)
         "bridge": {"const": r(bridge["const"], 3), "coef": {k: r(v, 3) for k, v in bridge["coef"].items()},
                    "labels": labels, "r2": r(bridge["r2"], 3), "sd": r(bridge["sd"], 2),
                    "n": bridge["n"], "sample": bridge["sample"], "estimated_at": bridge.get("estimated_at")},
-        "backtest": {kk: bt[kk] for kk in ("rmse", "mae", "ar_rmse", "n", "period")},
+        "backtest": {**{kk: bt[kk] for kk in ("rmse", "rmse_recent", "mae", "ar_rmse", "n", "period")},
+                     "rmse_eff": eff_rmse(bt), "rt_factor": RT_FACTOR, "rev_sd": REV_SD},
         "annual": annual,
         "deflator": {"ext": {k: meta[k].get("ext") for k in dkeys if meta[k].get("ext")},
                      "const": r(dbridge["const"], 3), "coef": {k: r(v, 3) for k, v in dbridge["coef"].items()},
